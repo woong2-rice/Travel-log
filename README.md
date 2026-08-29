@@ -12,6 +12,16 @@
 | `script.js` | 앱 로직 · Supabase 연동 |
 | `data/*.json` | 지도 데이터 (KR_MAP / WORLD_MAP / 국경 외곽선) |
 | `supabase/schema.sql` | `travel_entries` 테이블 + RLS 정책 |
+| `manifest.json` · `sw.js` | PWA 매니페스트 · 서비스워커 |
+| `favicon.*` · `icon-*.png` · `apple-touch-icon.png` | 앱 아이콘 |
+
+## PWA
+
+- `sw.js` 가 앱 셸(HTML/CSS/JS/아이콘/지도 JSON)을 캐시해 **오프라인에서도 지도가 열립니다**.
+  폰트·`supabase-js` CDN 은 stale-while-revalidate, Supabase 인증·데이터 요청은 캐시하지 않고 항상 네트워크로 보냅니다.
+- 설치: 크롬 주소창의 설치 아이콘 / iOS 사파리 "홈 화면에 추가".
+- `sw.js` 를 고치면 `VERSION` 상수를 올려 캐시를 무효화하세요.
+- HTTPS(또는 `localhost`)에서만 서비스워커가 동작합니다.
 
 ## 데이터 저장 방식
 
