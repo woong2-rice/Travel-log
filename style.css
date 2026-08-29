@@ -18,6 +18,20 @@
     font-family:-apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;overflow:hidden;
   }
   .app{height:100vh;height:100dvh;display:flex;flex-direction:column;}
+  .app[hidden]{display:none;}
+
+  .auth-screen{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;padding:20px;background:var(--paper);}
+  .auth-screen[hidden]{display:none;}
+  .auth-card{background:var(--card);border:1px solid var(--rule);border-radius:16px;padding:28px 24px;max-width:360px;width:100%;box-shadow:0 6px 24px rgba(38,49,61,0.14);}
+  .auth-card h1{font-family:'Fraunces',serif;font-weight:700;font-size:1.2rem;margin:0 0 8px;}
+  .auth-lead{color:var(--ink-soft);font-size:0.85rem;line-height:1.5;margin:0 0 18px;}
+  .auth-card label{margin-bottom:6px;}
+  .auth-card input{margin-bottom:12px;}
+  .auth-card .btn-primary{width:100%;}
+  .auth-msg{margin:14px 0 0;font-size:0.82rem;color:var(--teal-dark);line-height:1.5;}
+  .auth-msg.error{color:var(--danger);}
+  .auth-msg[hidden]{display:none;}
+  .user-email{font-family:'Space Mono',monospace;font-size:0.66rem;color:var(--ink-soft);max-width:140px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
 
   .topbar{
     flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:10px;
@@ -199,4 +213,5 @@
     .tab-btn{padding:6px 7px;font-size:0.64rem;}
     .icon-btn{width:28px;height:28px;font-size:0.85rem;}
     .stat-cards{grid-template-columns:repeat(2,1fr);}
+    .user-email{display:none;}
   }

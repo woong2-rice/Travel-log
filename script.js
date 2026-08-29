@@ -1,6 +1,10 @@
 (async function () {
-  const STORAGE_KEY = 'travel-map-entries';
+  const SUPABASE_URL = 'https://vqmdcyoldsosvonlagdv.supabase.co';
+  const SUPABASE_ANON_KEY = 'sb_publishable_Q5LoKBKG0YtgZivMORFTsQ_jXfF_0pB';
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const THEME_KEY = 'travel-app-theme';
   let entries = [];
+  let userId = null;
   let currentRegion = null;
   let currentCountryPicker = null;
   let pendingPhoto = null;
@@ -121,20 +125,37 @@
     }
   }
 
+  // travel_entries 테이블은 사용자당 한 행(user_id, data jsonb, updated_at)에
+  // 기록 배열 전체를 담습니다. window.storage 를 그대로 대체하는 구조예요.
   async function loadEntries(){
     try{
-      const res = await window.storage.get(STORAGE_KEY, false);
-      entries = res ? JSON.parse(res.value) : [];
+      if(!userId) throw new Error('로그인이 필요합니다.');
+      const { data, error } = await sb
+        .from('travel_entries')
+        .select('data')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if(error) throw error;
+      entries = (data && Array.isArray(data.data)) ? data.data : [];
     }catch(e){
+      console.error('기록을 불러오지 못했어요', e);
       entries = [];
     }
     refresh();
   }
   async function saveEntries(){
     try{
-      await window.storage.set(STORAGE_KEY, JSON.stringify(entries), false);
+      if(!userId) throw new Error('로그인이 필요합니다.');
+      const { error } = await sb
+        .from('travel_entries')
+        .upsert(
+          { user_id: userId, data: entries, updated_at: new Date().toISOString() },
+          { onConflict: 'user_id' }
+        );
+      if(error) throw error;
     }catch(e){
       console.error('저장 실패', e);
+      alert('저장하지 못했어요: ' + e.message);
     }
   }
 
@@ -711,13 +732,13 @@
     btn.addEventListener('click', async ()=>{
       applyTheme(btn.dataset.theme);
       document.getElementById('theme-popover').hidden = true;
-      try{ await window.storage.set('travel-app-theme', btn.dataset.theme, false); }catch(e){}
+      try{ localStorage.setItem(THEME_KEY, btn.dataset.theme); }catch(e){}
     });
   });
-  async function loadTheme(){
+  function loadTheme(){
     try{
-      const res = await window.storage.get('travel-app-theme', false);
-      if(res && res.value) applyTheme(res.value);
+      const v = localStorage.getItem(THEME_KEY);
+      if(v) applyTheme(v);
     }catch(e){ /* no saved theme yet */ }
   }
   loadTheme();
@@ -740,7 +761,63 @@
     });
   });
 
-  loadEntries();
+  // ---------- Auth (이메일 매직링크) ----------
+  const authScreen = document.getElementById('auth-screen');
+  const appEl = document.querySelector('.app');
+  const authForm = document.getElementById('auth-form');
+  const authMsg = document.getElementById('auth-msg');
+  let appInited = false;
+
+  async function enterApp(session){
+    userId = session.user.id;
+    authScreen.hidden = true;
+    appEl.hidden = false;
+    document.getElementById('user-email').textContent = session.user.email || '';
+    if(!appInited){
+      appInited = true;
+      await loadEntries();
+    }
+  }
+  function exitApp(){
+    appInited = false;
+    userId = null;
+    entries = [];
+    appEl.hidden = true;
+    authScreen.hidden = false;
+  }
+
+  authForm.addEventListener('submit', async (ev)=>{
+    ev.preventDefault();
+    const email = document.getElementById('auth-email').value.trim();
+    if(!email) return;
+    const btn = document.getElementById('auth-submit');
+    btn.disabled = true;
+    authMsg.hidden = false;
+    authMsg.classList.remove('error');
+    authMsg.textContent = '보내는 중…';
+    const { error } = await sb.auth.signInWithOtp({
+      email,
+      options: { emailRedirectTo: window.location.origin + window.location.pathname }
+    });
+    btn.disabled = false;
+    if(error){
+      authMsg.classList.add('error');
+      authMsg.textContent = '보내지 못했어요: ' + error.message;
+    }else{
+      authMsg.textContent = email + ' 로 로그인 링크를 보냈어요. 메일함을 확인하세요.';
+    }
+  });
+
+  document.getElementById('logout-btn').addEventListener('click', ()=> sb.auth.signOut());
+
+  sb.auth.onAuthStateChange((_event, session)=>{
+    if(session) enterApp(session);
+    else exitApp();
+  });
+
+  const { data: { session } } = await sb.auth.getSession();
+  if(session) enterApp(session);
+  else exitApp();
 })().catch((err) => {
   console.error(err);
   document.body.insertAdjacentHTML('afterbegin',

@@ -19,7 +19,20 @@
     </defs>
   </svg>
 
-  <div class="app">
+  <div id="auth-screen" class="auth-screen" hidden>
+    <div class="auth-card">
+      <h1>✈ 여행 기록장</h1>
+      <p class="auth-lead">이메일로 로그인 링크를 보내드려요. 메일함에서 링크를 누르면 로그인됩니다.</p>
+      <form id="auth-form">
+        <label for="auth-email">이메일</label>
+        <input id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com">
+        <button type="submit" class="btn-primary" id="auth-submit">매직링크 보내기</button>
+      </form>
+      <p id="auth-msg" class="auth-msg" hidden></p>
+    </div>
+  </div>
+
+  <div class="app" hidden>
     <header class="topbar">
       <h1>✈ 여행 기록장</h1>
       <div class="topbar-right">
@@ -42,6 +55,8 @@
           <button type="button" class="theme-swatch" data-theme="purple" style="background:#7A5C8A" title="퍼플"></button>
           <button type="button" class="theme-swatch" data-theme="coral" style="background:#C1684F" title="코랄"></button>
         </div>
+        <span id="user-email" class="user-email"></span>
+        <button type="button" id="logout-btn" class="icon-btn" aria-label="로그아웃" title="로그아웃">⎋</button>
       </div>
     </header>
 
@@ -214,6 +229,7 @@
       <div id="analytics-content" class="analytics-content"></div>
     </section>
   </div>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="script.js"></script>
 </body>
 </html>
