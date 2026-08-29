@@ -33,11 +33,17 @@
   <div id="auth-screen" class="auth-screen" hidden>
     <div class="auth-card">
       <h1>✈ 여행 기록장</h1>
-      <p class="auth-lead">이메일로 로그인 링크를 보내드려요. 메일함에서 링크를 누르면 로그인됩니다.</p>
+      <p class="auth-lead">이메일로 8자리 로그인 코드를 보내드려요. 메일함에서 코드를 확인해 입력하세요.</p>
       <form id="auth-form">
         <label for="auth-email">이메일</label>
         <input id="auth-email" type="email" required autocomplete="email" placeholder="you@example.com">
-        <button type="submit" class="btn-primary" id="auth-submit">매직링크 보내기</button>
+        <button type="submit" class="btn-primary" id="auth-submit">코드 보내기</button>
+      </form>
+      <form id="auth-code-form" hidden>
+        <label for="auth-code">이메일로 받은 8자리 코드</label>
+        <input id="auth-code" type="text" inputmode="numeric" autocomplete="one-time-code" pattern="[0-9]*" maxlength="8" placeholder="00000000">
+        <button type="submit" class="btn-primary" id="auth-verify">확인</button>
+        <button type="button" class="btn-link" id="auth-back">← 다른 이메일로</button>
       </form>
       <p id="auth-msg" class="auth-msg" hidden></p>
     </div>

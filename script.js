@@ -1,13 +1,23 @@
 (async function () {
   const SUPABASE_URL = 'https://vqmdcyoldsosvonlagdv.supabase.co';
   const SUPABASE_ANON_KEY = 'sb_publishable_Q5LoKBKG0YtgZivMORFTsQ_jXfF_0pB';
-  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    auth: {
+      // 홈 화면 앱(스탠드얼론)으로 다시 열어도 로그인이 유지되도록
+      persistSession: true,
+      autoRefreshToken: true,
+      detectSessionInUrl: true,
+      storage: window.localStorage,
+      storageKey: 'travel-log-auth',
+    },
+  });
   const THEME_KEY = 'travel-app-theme';
   let entries = [];
   let userId = null;
   let currentRegion = null;
   let currentCountryPicker = null;
-  let pendingPhoto = null;
+  let pendingPhotoBlob = null;
+  const PHOTO_BUCKET = 'trip-photos';
 
   let KR_MAP = [];
   let WORLD_MAP = [];
@@ -134,38 +144,68 @@
     }
   }
 
-  // travel_entries 테이블은 사용자당 한 행(user_id, data jsonb, updated_at)에
-  // 기록 배열 전체를 담습니다. window.storage 를 그대로 대체하는 구조예요.
+  // entries 테이블: 기록 하나당 한 행. 사진은 trip-photos Storage 버킷에 올리고
+  // 공개 URL만 photo_url 컬럼에 저장합니다. 추가/삭제/변경은 그 행만 insert/delete/update.
+  function rowToEntry(r){
+    return {
+      id: r.id,
+      scope: r.scope,
+      regionId: r.region_id,
+      regionName: r.region_name,
+      status: r.status,
+      startDate: r.start_date,
+      endDate: r.end_date || r.start_date,
+      companion: r.companion || '',
+      place: r.place || '',
+      note: r.note || '',
+      costs: {
+        lodging: r.cost_lodging || 0,
+        transport: r.cost_transport || 0,
+        food: r.cost_food || 0,
+        other: r.cost_other || 0
+      },
+      photo: r.photo_url || null
+    };
+  }
+
   async function loadEntries(){
     try{
       if(!userId) throw new Error('로그인이 필요합니다.');
       const { data, error } = await sb
-        .from('travel_entries')
-        .select('data')
+        .from('entries')
+        .select('*')
         .eq('user_id', userId)
-        .maybeSingle();
+        .order('start_date', { ascending: true });
       if(error) throw error;
-      entries = (data && Array.isArray(data.data)) ? data.data : [];
+      entries = (data || []).map(rowToEntry);
     }catch(e){
       console.error('기록을 불러오지 못했어요', e);
       entries = [];
     }
     refresh();
   }
-  async function saveEntries(){
-    try{
-      if(!userId) throw new Error('로그인이 필요합니다.');
-      const { error } = await sb
-        .from('travel_entries')
-        .upsert(
-          { user_id: userId, data: entries, updated_at: new Date().toISOString() },
-          { onConflict: 'user_id' }
-        );
-      if(error) throw error;
-    }catch(e){
-      console.error('저장 실패', e);
-      alert('저장하지 못했어요: ' + e.message);
-    }
+
+  // 압축한 이미지(Blob)를 trip-photos 버킷에 올리고 공개 URL을 돌려줍니다.
+  async function uploadPhoto(blob){
+    const path = `${userId}/${crypto.randomUUID()}.jpg`;
+    const { error } = await sb.storage
+      .from(PHOTO_BUCKET)
+      .upload(path, blob, { contentType: 'image/jpeg', upsert: false });
+    if(error) throw error;
+    const { data } = sb.storage.from(PHOTO_BUCKET).getPublicUrl(path);
+    return data.publicUrl;
+  }
+
+  function storagePathFromUrl(url){
+    const marker = `/${PHOTO_BUCKET}/`;
+    const i = url.indexOf(marker);
+    return i === -1 ? null : url.slice(i + marker.length).split('?')[0];
+  }
+  async function deletePhoto(url){
+    const path = storagePathFromUrl(url);
+    if(!path) return;
+    const { error } = await sb.storage.from(PHOTO_BUCKET).remove([path]);
+    if(error) console.warn('사진 파일 삭제 실패(무시)', error);
   }
 
   // ---------- Domestic (municipality) map ----------
@@ -412,7 +452,10 @@
           const canvas = document.createElement('canvas');
           canvas.width = w; canvas.height = h;
           canvas.getContext('2d').drawImage(img,0,0,w,h);
-          resolve(canvas.toDataURL('image/jpeg', 0.65));
+          canvas.toBlob(
+            (blob)=> blob ? resolve(blob) : reject(new Error('이미지 변환에 실패했어요.')),
+            'image/jpeg', 0.65
+          );
         };
         img.onerror = reject;
         img.src = reader.result;
@@ -424,11 +467,14 @@
   document.getElementById('panel-photo').addEventListener('change', async (ev)=>{
     const file = ev.target.files[0];
     const preview = document.getElementById('photo-preview');
-    if(!file){ pendingPhoto = null; preview.hidden = true; return; }
+    if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
+    if(!file){ pendingPhotoBlob = null; preview.hidden = true; return; }
     try{
-      pendingPhoto = await readAndCompressImage(file);
-      preview.src = pendingPhoto; preview.hidden = false;
-    }catch(err){ console.error(err); }
+      pendingPhotoBlob = await readAndCompressImage(file);
+      const objUrl = URL.createObjectURL(pendingPhotoBlob);
+      preview.dataset.objurl = objUrl;
+      preview.src = objUrl; preview.hidden = false;
+    }catch(err){ console.error(err); pendingPhotoBlob = null; }
   });
 
   // ---------- Shared panel ----------
@@ -439,8 +485,10 @@
     document.getElementById('panel-form').reset();
     document.getElementById('panel-form').hidden = false;
     document.getElementById('panel-state-picker').hidden = true;
-    pendingPhoto = null;
-    document.getElementById('photo-preview').hidden = true;
+    pendingPhotoBlob = null;
+    const preview = document.getElementById('photo-preview');
+    if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
+    preview.hidden = true;
     document.getElementById('region-panel').hidden = false;
     renderPanelEntries();
     document.getElementById('panel-start').focus();
@@ -669,16 +717,30 @@
   }
 
   async function removeEntry(id){
-    entries = entries.filter(e=> e.id!==id);
-    await saveEntries();
-    refresh();
+    const target = entries.find(e=> e.id===id);
+    try{
+      const { error } = await sb.from('entries').delete().eq('id', id);
+      if(error) throw error;
+      if(target && target.photo) await deletePhoto(target.photo);
+      entries = entries.filter(e=> e.id!==id);
+      refresh();
+    }catch(err){
+      console.error('삭제 실패', err);
+      alert('삭제하지 못했어요: ' + err.message);
+    }
   }
   async function markVisited(id){
     const e = entries.find(x=>x.id===id);
     if(!e) return;
-    e.status = 'visited';
-    await saveEntries();
-    refresh();
+    try{
+      const { error } = await sb.from('entries').update({ status: 'visited' }).eq('id', id);
+      if(error) throw error;
+      e.status = 'visited';
+      refresh();
+    }catch(err){
+      console.error('변경 실패', err);
+      alert('변경하지 못했어요: ' + err.message);
+    }
   }
 
   document.getElementById('panel-form').addEventListener('submit', async (ev)=>{
@@ -686,7 +748,7 @@
     if(!currentRegion) return;
     const status = document.querySelector('input[name="panel-status"]:checked').value;
     const startDate = document.getElementById('panel-start').value;
-    const endDate = document.getElementById('panel-end').value || startDate;
+    const endDateRaw = document.getElementById('panel-end').value;
     const companion = document.getElementById('panel-companion').value.trim();
     const place = document.getElementById('panel-place').value.trim();
     const note = document.getElementById('panel-note').value.trim();
@@ -697,19 +759,46 @@
       other: Number(document.getElementById('panel-cost-other').value) || 0
     };
     if(!startDate) return;
-    entries.push({
-      id: Date.now().toString(36) + Math.random().toString(36).slice(2),
-      scope: currentRegion.scope,
-      regionId: currentRegion.id,
-      regionName: currentRegion.name,
-      status, startDate, endDate, companion, place, note, costs,
-      photo: pendingPhoto || null
-    });
-    ev.target.reset();
-    pendingPhoto = null;
-    document.getElementById('photo-preview').hidden = true;
-    await saveEntries();
-    refresh();
+
+    const submitBtn = ev.target.querySelector('button[type="submit"]');
+    submitBtn.disabled = true;
+    try{
+      let photoUrl = null;
+      if(pendingPhotoBlob) photoUrl = await uploadPhoto(pendingPhotoBlob);
+
+      const row = {
+        user_id: userId,
+        scope: currentRegion.scope,
+        region_id: currentRegion.id,
+        region_name: currentRegion.name,
+        status,
+        start_date: startDate,
+        end_date: (endDateRaw && endDateRaw !== startDate) ? endDateRaw : null,
+        companion: companion || null,
+        place: place || null,
+        note: note || null,
+        cost_lodging: costs.lodging,
+        cost_transport: costs.transport,
+        cost_food: costs.food,
+        cost_other: costs.other,
+        photo_url: photoUrl
+      };
+      const { data, error } = await sb.from('entries').insert(row).select().single();
+      if(error) throw error;
+
+      entries.push(rowToEntry(data));
+      ev.target.reset();
+      pendingPhotoBlob = null;
+      const preview = document.getElementById('photo-preview');
+      if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
+      preview.hidden = true;
+      refresh();
+    }catch(err){
+      console.error('기록 저장 실패', err);
+      alert('기록을 저장하지 못했어요: ' + err.message);
+    }finally{
+      submitBtn.disabled = false;
+    }
   });
 
   document.getElementById('panel-close').addEventListener('click', closePanel);
@@ -772,12 +861,35 @@
     });
   });
 
-  // ---------- Auth (이메일 매직링크) ----------
+  // ---------- Auth (이메일 8자리 코드) ----------
   const authScreen = document.getElementById('auth-screen');
   const appEl = document.querySelector('.app');
   const authForm = document.getElementById('auth-form');
+  const authCodeForm = document.getElementById('auth-code-form');
   const authMsg = document.getElementById('auth-msg');
+  const emailInput = document.getElementById('auth-email');
+  const codeInput = document.getElementById('auth-code');
+  let pendingEmail = null;
   let appInited = false;
+
+  function showMsg(text, isError){
+    authMsg.hidden = false;
+    authMsg.classList.toggle('error', !!isError);
+    authMsg.textContent = text;
+  }
+  function showEmailStep(){
+    pendingEmail = null;
+    authCodeForm.hidden = true;
+    authForm.hidden = false;
+    authMsg.hidden = true;
+  }
+  function showCodeStep(email){
+    pendingEmail = email;
+    authForm.hidden = true;
+    authCodeForm.hidden = false;
+    codeInput.value = '';
+    codeInput.focus();
+  }
 
   async function enterApp(session){
     userId = session.user.id;
@@ -795,40 +907,60 @@
     entries = [];
     appEl.hidden = true;
     authScreen.hidden = false;
+    showEmailStep();
   }
 
   authForm.addEventListener('submit', async (ev)=>{
     ev.preventDefault();
-    const email = document.getElementById('auth-email').value.trim();
+    const email = emailInput.value.trim();
     if(!email) return;
     const btn = document.getElementById('auth-submit');
     btn.disabled = true;
-    authMsg.hidden = false;
-    authMsg.classList.remove('error');
-    authMsg.textContent = '보내는 중…';
-    const { error } = await sb.auth.signInWithOtp({
-      email,
-      options: { emailRedirectTo: window.location.origin + window.location.pathname }
-    });
+    showMsg('보내는 중…');
+    // emailRedirectTo를 넘기지 않으면 매직링크 대신 코드가 메일로 전송된다.
+    const { error } = await sb.auth.signInWithOtp({ email });
     btn.disabled = false;
     if(error){
-      authMsg.classList.add('error');
-      authMsg.textContent = '보내지 못했어요: ' + error.message;
+      showMsg('보내지 못했어요: ' + error.message, true);
     }else{
-      authMsg.textContent = email + ' 로 로그인 링크를 보냈어요. 메일함을 확인하세요.';
+      showCodeStep(email);
+      showMsg(email + ' 로 8자리 코드를 보냈어요. 메일함을 확인하세요.');
     }
+  });
+
+  document.getElementById('auth-back').addEventListener('click', showEmailStep);
+
+  authCodeForm.addEventListener('submit', async (ev)=>{
+    ev.preventDefault();
+    const token = codeInput.value.trim();
+    if(!pendingEmail || token.length < 8) return;
+    const btn = document.getElementById('auth-verify');
+    btn.disabled = true;
+    showMsg('확인 중…');
+    const { error } = await sb.auth.verifyOtp({ email: pendingEmail, token, type: 'email' });
+    btn.disabled = false;
+    if(error){
+      showMsg('코드가 올바르지 않아요: ' + error.message, true);
+    }
+    // 성공하면 onAuthStateChange(SIGNED_IN)가 enterApp을 호출한다.
   });
 
   document.getElementById('logout-btn').addEventListener('click', ()=> sb.auth.signOut());
 
-  sb.auth.onAuthStateChange((_event, session)=>{
-    if(session) enterApp(session);
-    else exitApp();
-  });
-
-  const { data: { session } } = await sb.auth.getSession();
-  if(session) enterApp(session);
+  // 앱이 뜨자마자 저장된 세션이 있는지 먼저 확인한다.
+  // 세션이 있으면 로그인 화면을 아예 거치지 않고 바로 앱으로 들어간다.
+  const { data: { session: existingSession } } = await sb.auth.getSession();
+  if(existingSession) enterApp(existingSession);
   else exitApp();
+
+  // 이후 로그인/로그아웃(매직링크 복귀, 토큰 만료 등) 변화에 반응한다.
+  sb.auth.onAuthStateChange((event, session)=>{
+    if(session){
+      enterApp(session);
+    }else if(event === 'SIGNED_OUT'){
+      exitApp();
+    }
+  });
 })().catch((err) => {
   console.error(err);
   document.body.insertAdjacentHTML('afterbegin',
