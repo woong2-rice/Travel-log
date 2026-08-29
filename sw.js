@@ -3,7 +3,7 @@
    - 폰트·supabase-js CDN은 런타임 캐시(stale-while-revalidate)
    - Supabase API(인증·데이터)는 항상 네트워크로 통과시킴 (캐시 안 함) */
 
-const VERSION = 'v1';
+const VERSION = 'v2';
 const SHELL_CACHE = `travel-log-shell-${VERSION}`;
 const RUNTIME_CACHE = `travel-log-runtime-${VERSION}`;
 
@@ -14,10 +14,10 @@ const SHELL_ASSETS = [
   'script.js',
   'manifest.json',
   'favicon.svg',
-  'favicon.png',
-  'apple-touch-icon.png',
-  'icon-192.png',
-  'icon-512.png',
+  'icon/favicon-32.png',
+  'icon/apple-touch-icon.png',
+  'icon/icon-192.png',
+  'icon/icon-512.png',
   'data/kr-map.json',
   'data/world-map.json',
   'data/world-outlines.json'
