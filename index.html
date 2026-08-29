@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>여행 기록장</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,wght@0,600;0,700;1,500&family=Space+Mono:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <svg width="0" height="0" style="position:absolute;overflow:hidden;" aria-hidden="true">
+    <defs>
+      <pattern id="hatch-planned" width="6" height="6" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+        <rect width="6" height="6" fill="#FBF8F1"></rect>
+        <line x1="0" y1="0" x2="0" y2="6" stroke="#C08A3E" stroke-width="2"></line>
+      </pattern>
+    </defs>
+  </svg>
+
+  <div class="app">
+    <header class="topbar">
+      <h1>✈ 여행 기록장</h1>
+      <div class="topbar-right">
+        <nav class="main-tabs">
+          <button type="button" class="tab-btn active" data-view="map">지도</button>
+          <button type="button" class="tab-btn" data-view="timeline">연표</button>
+          <button type="button" class="tab-btn" data-view="plan">플랜</button>
+          <button type="button" class="tab-btn" data-view="analytics">분석</button>
+        </nav>
+        <button type="button" id="theme-btn" class="icon-btn" aria-label="색상 테마 선택">🎨</button>
+        <div id="theme-popover" class="theme-popover" hidden>
+          <button type="button" class="theme-swatch active" data-theme="teal" style="background:#3D7068" title="틸(기본)"></button>
+          <button type="button" class="theme-swatch" data-theme="black" style="background:#33383D" title="블랙"></button>
+          <button type="button" class="theme-swatch" data-theme="pink" style="background:#B8607A" title="핑크"></button>
+          <button type="button" class="theme-swatch" data-theme="blue" style="background:#3D5A80" title="블루"></button>
+          <button type="button" class="theme-swatch" data-theme="skyblue" style="background:#5FA8D3" title="스카이블루"></button>
+          <button type="button" class="theme-swatch" data-theme="green" style="background:#5C8A52" title="그린"></button>
+          <button type="button" class="theme-swatch" data-theme="yellow" style="background:#C99A3A" title="옐로우"></button>
+          <button type="button" class="theme-swatch" data-theme="gray" style="background:#6B6F76" title="그레이"></button>
+          <button type="button" class="theme-swatch" data-theme="purple" style="background:#7A5C8A" title="퍼플"></button>
+          <button type="button" class="theme-swatch" data-theme="coral" style="background:#C1684F" title="코랄"></button>
+        </div>
+      </div>
+    </header>
+
+    <section id="view-map" class="view">
+      <div class="map-toolbar">
+        <nav class="sub-tabs">
+          <button type="button" class="subtab-btn active" data-scope="domestic">국내</button>
+          <button type="button" class="subtab-btn" data-scope="world">해외</button>
+        </nav>
+        <span class="progress" id="progress-domestic"></span>
+        <span class="progress" id="progress-world" hidden></span>
+        <p class="map-caption" id="map-caption">시/군/구 경계까지 살린 지도예요. 다녀올수록 10단계로 짙어지고, 계획만 있으면 빗금으로 표시돼요.</p>
+      </div>
+
+      <div class="map-stage">
+        <div id="map-domestic" class="map-scope">
+          <svg id="kr-svg" viewBox="0 0 916.0 970.8" xmlns="http://www.w3.org/2000/svg" preserveAspectRatio="xMidYMid meet"></svg>
+        </div>
+
+        <div id="map-world" class="map-scope" hidden>
+          <div id="world-desktop" class="world-desktop-only">
+            <svg id="world-svg" viewBox="0 0 1000.0 397.2" xmlns="http://www.w3.org/2000/svg"></svg>
+            <div class="zoom-ctrl">
+              <button type="button" id="zoom-in" aria-label="확대">+</button>
+              <button type="button" id="zoom-out" aria-label="축소">−</button>
+              <button type="button" id="zoom-reset" aria-label="원래대로" style="font-size:0.6rem;">RESET</button>
+            </div>
+            <div class="zoom-hint">휠로 확대, 드래그로 이동 · 굵은 선=국경(고정 두께), 얇은 선=내부 행정구역</div>
+          </div>
+          <div id="world-mobile" class="world-mobile-only">
+            <div class="country-add">
+              <input id="country-input" type="text" list="country-list" placeholder="나라 이름 입력 (예: 일본, 프랑스)">
+              <datalist id="country-list">
+  <option value="일본"></option>
+  <option value="중국"></option>
+  <option value="대만"></option>
+  <option value="홍콩"></option>
+  <option value="베트남"></option>
+  <option value="태국"></option>
+  <option value="싱가포르"></option>
+  <option value="말레이시아"></option>
+  <option value="인도네시아"></option>
+  <option value="필리핀"></option>
+  <option value="인도"></option>
+  <option value="몽골"></option>
+  <option value="아랍에미리트"></option>
+  <option value="튀르키예"></option>
+  <option value="이스라엘"></option>
+  <option value="이집트"></option>
+  <option value="모로코"></option>
+  <option value="남아프리카공화국"></option>
+  <option value="케냐"></option>
+  <option value="프랑스"></option>
+  <option value="영국"></option>
+  <option value="독일"></option>
+  <option value="이탈리아"></option>
+  <option value="스페인"></option>
+  <option value="포르투갈"></option>
+  <option value="네덜란드"></option>
+  <option value="스위스"></option>
+  <option value="오스트리아"></option>
+  <option value="체코"></option>
+  <option value="그리스"></option>
+  <option value="크로아티아"></option>
+  <option value="헝가리"></option>
+  <option value="폴란드"></option>
+  <option value="아이슬란드"></option>
+  <option value="스웨덴"></option>
+  <option value="노르웨이"></option>
+  <option value="핀란드"></option>
+  <option value="덴마크"></option>
+  <option value="러시아"></option>
+  <option value="미국"></option>
+  <option value="캐나다"></option>
+  <option value="멕시코"></option>
+  <option value="브라질"></option>
+  <option value="아르헨티나"></option>
+  <option value="페루"></option>
+  <option value="칠레"></option>
+  <option value="호주"></option>
+  <option value="뉴질랜드"></option>
+              </datalist>
+              <button type="button" id="country-add-btn" class="btn-primary">추가</button>
+            </div>
+            <div id="country-chips" class="chip-wrap"></div>
+          </div>
+        </div>
+      </div>
+
+      <div id="region-panel" class="region-panel" hidden>
+        <div class="region-panel-head">
+          <h3 id="panel-region-name"></h3>
+          <button type="button" id="panel-close">닫기</button>
+        </div>
+        <div id="panel-state-picker" hidden>
+          <div class="field">
+            <label for="panel-state-select">어느 지역인가요?</label>
+            <select id="panel-state-select"></select>
+          </div>
+          <button type="button" id="panel-state-confirm" class="btn-primary">다음</button>
+        </div>
+        <ul id="panel-entries" class="panel-entries"></ul>
+        <form id="panel-form">
+          <div class="field" style="grid-column:1/-1">
+            <label>상태</label>
+            <div class="status-toggle">
+              <label class="radio-pill"><input type="radio" name="panel-status" value="visited" checked> 다녀왔어요</label>
+              <label class="radio-pill"><input type="radio" name="panel-status" value="planned"> 계획 중이에요</label>
+            </div>
+          </div>
+          <div class="field">
+            <label for="panel-start">시작일</label>
+            <input id="panel-start" type="date" required>
+          </div>
+          <div class="field">
+            <label for="panel-end">종료일 (선택)</label>
+            <input id="panel-end" type="date">
+          </div>
+          <div class="field">
+            <label for="panel-companion">동행 (선택)</label>
+            <input id="panel-companion" type="text" placeholder="예: 가족, 민수">
+          </div>
+          <div class="field">
+            <label for="panel-place">세부 장소 (선택)</label>
+            <input id="panel-place" type="text" placeholder="예: 강릉, 교토">
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label for="panel-note">메모 (선택)</label>
+            <input id="panel-note" type="text" placeholder="짧은 한마디">
+          </div>
+          <div class="field">
+            <label for="panel-cost-lodging">숙박비 (선택, 원)</label>
+            <input id="panel-cost-lodging" type="number" min="0" step="1000" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="panel-cost-transport">교통비 (선택, 원)</label>
+            <input id="panel-cost-transport" type="number" min="0" step="1000" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="panel-cost-food">식비 (선택, 원)</label>
+            <input id="panel-cost-food" type="number" min="0" step="1000" placeholder="0">
+          </div>
+          <div class="field">
+            <label for="panel-cost-other">기타비용 (선택, 원)</label>
+            <input id="panel-cost-other" type="number" min="0" step="1000" placeholder="0">
+          </div>
+          <div class="field" style="grid-column:1/-1">
+            <label for="panel-photo">사진 (선택, 1장)</label>
+            <input id="panel-photo" type="file" accept="image/*">
+            <img id="photo-preview" hidden alt="선택한 사진 미리보기">
+          </div>
+          <button type="submit" class="btn-primary" style="grid-column:1/-1">이 지역에 기록 추가</button>
+        </form>
+      </div>
+    </section>
+
+    <section id="view-timeline" class="view" hidden>
+      <div id="timeline-list" class="timeline"></div>
+    </section>
+
+    <section id="view-plan" class="view" hidden>
+      <div class="plan-header">
+        <p class="map-caption">앞으로 갈 곳을 계획해보세요. 지도에서 지역을 누르고 "계획 중이에요"를 선택하면 여기 쌓여요.</p>
+        <button type="button" id="plan-go-map-btn" class="btn-primary">지도에서 추가하기</button>
+      </div>
+      <div id="plan-list" class="timeline"></div>
+    </section>
+
+    <section id="view-analytics" class="view" hidden>
+      <div id="analytics-content" class="analytics-content"></div>
+    </section>
+  </div>
+<script src="script.js"></script>
+</body>
+</html>
