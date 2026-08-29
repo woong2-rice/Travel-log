@@ -95,6 +95,15 @@
     const raw = getComputedStyle(document.documentElement).getPropertyValue('--teal').trim();
     try{ return hexToHsl(raw); }catch(e){ return { h:168, s:32, l:34 }; }
   }
+  function updateMapTokens(){
+    const { h } = themeAccentHsl();
+    const root = document.documentElement.style;
+    root.setProperty('--map-bg', `hsl(${h},22%,90%)`);
+    root.setProperty('--map-card', `hsl(${h},12%,96%)`);
+    root.setProperty('--map-rule', `hsl(${h},22%,74%)`);
+    root.setProperty('--map-ink', `hsl(${h},25%,24%)`);
+    root.setProperty('--map-ink-soft', `hsl(${h},15%,44%)`);
+  }
 
   function colorForCount(count){
     const accent = themeAccentHsl();
@@ -723,6 +732,7 @@
   });
   function applyTheme(name){
     document.documentElement.setAttribute('data-theme', name);
+    updateMapTokens();
     document.querySelectorAll('.theme-swatch').forEach(b=> b.classList.toggle('active', b.dataset.theme===name));
     renderDomesticMap();
     renderWorldMap();
@@ -738,8 +748,9 @@
   function loadTheme(){
     try{
       const v = localStorage.getItem(THEME_KEY);
-      if(v) applyTheme(v);
+      if(v){ applyTheme(v); return; }
     }catch(e){ /* no saved theme yet */ }
+    updateMapTokens();
   }
   loadTheme();
   document.getElementById('plan-go-map-btn').addEventListener('click', ()=>{
