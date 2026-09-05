@@ -17,7 +17,11 @@
   let currentRegion = null;
   let currentCountryPicker = null;
   let pendingPhotoBlob = null;
+  let editingEntryId = null;
+  let existingPhotoUrl = null;
   const PHOTO_BUCKET = 'trip-photos';
+  const ADD_BTN_TEXT = '이 지역에 기록 추가';
+  const EDIT_BTN_TEXT = '수정 완료';
 
   let KR_MAP = [];
   let WORLD_MAP = [];
@@ -429,10 +433,14 @@
         <li class="panel-entry">
           <span class="pe-date">${formatRange(e)}</span>
           <span class="pe-text">${bits.join(' · ')}</span>
+          <button type="button" class="pe-edit" data-id="${e.id}">수정</button>
           <button type="button" class="pe-remove" data-id="${e.id}">삭제</button>
         </li>
       `;
     }).join('');
+    ul.querySelectorAll('.pe-edit').forEach(btn=>{
+      btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id));
+    });
     ul.querySelectorAll('.pe-remove').forEach(btn=>{
       btn.addEventListener('click', ()=> removeEntry(btn.dataset.id));
     });
@@ -481,10 +489,13 @@
   function openPanel(scope, id, name){
     currentRegion = {scope, id, name};
     currentCountryPicker = null;
+    editingEntryId = null;
+    existingPhotoUrl = null;
     document.getElementById('panel-region-name').textContent = name;
     document.getElementById('panel-form').reset();
     document.getElementById('panel-form').hidden = false;
     document.getElementById('panel-state-picker').hidden = true;
+    document.querySelector('#panel-form button[type="submit"]').textContent = ADD_BTN_TEXT;
     pendingPhotoBlob = null;
     const preview = document.getElementById('photo-preview');
     if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
@@ -496,9 +507,58 @@
   function closePanel(){
     currentRegion = null;
     currentCountryPicker = null;
+    editingEntryId = null;
+    existingPhotoUrl = null;
     document.getElementById('region-panel').hidden = true;
     document.getElementById('panel-state-picker').hidden = true;
     document.getElementById('panel-form').hidden = false;
+    document.querySelector('#panel-form button[type="submit"]').textContent = ADD_BTN_TEXT;
+  }
+
+  function switchToMapView(){
+    const tabBtn = document.querySelector('.tab-btn[data-view="map"]');
+    if(tabBtn && !tabBtn.classList.contains('active')) tabBtn.click();
+  }
+  function switchMapScope(scope){
+    const subBtn = document.querySelector(`.subtab-btn[data-scope="${scope}"]`);
+    if(subBtn && !subBtn.classList.contains('active')) subBtn.click();
+  }
+
+  // 연표/플랜/지역 패널의 '수정' 버튼: 기존 기록 값으로 채운 채 그 지역의 패널을 연다.
+  function startEditEntry(id){
+    const entry = entries.find(e=> e.id===id);
+    if(!entry) return;
+    switchToMapView();
+    switchMapScope(entry.scope);
+    openPanel(entry.scope, entry.regionId, entry.regionName);
+    fillPanelFormForEdit(entry);
+  }
+
+  function fillPanelFormForEdit(entry){
+    editingEntryId = entry.id;
+    existingPhotoUrl = entry.photo || null;
+    document.querySelector(`input[name="panel-status"][value="${entry.status}"]`).checked = true;
+    document.getElementById('panel-start').value = entry.startDate;
+    document.getElementById('panel-end').value = (entry.endDate && entry.endDate !== entry.startDate) ? entry.endDate : '';
+    document.getElementById('panel-companion').value = entry.companion || '';
+    document.getElementById('panel-place').value = entry.place || '';
+    document.getElementById('panel-note').value = entry.note || '';
+    document.getElementById('panel-cost-lodging').value = entry.costs.lodging || '';
+    document.getElementById('panel-cost-transport').value = entry.costs.transport || '';
+    document.getElementById('panel-cost-food').value = entry.costs.food || '';
+    document.getElementById('panel-cost-other').value = entry.costs.other || '';
+    document.getElementById('panel-photo').value = '';
+    pendingPhotoBlob = null;
+    const preview = document.getElementById('photo-preview');
+    if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
+    if(entry.photo){
+      preview.src = entry.photo;
+      preview.hidden = false;
+    }else{
+      preview.hidden = true;
+      preview.removeAttribute('src');
+    }
+    document.querySelector('#panel-form button[type="submit"]').textContent = EDIT_BTN_TEXT;
   }
   function renderPanelEntries(){
     if(!currentRegion) return;
@@ -522,10 +582,14 @@
           <span class="pe-date">${formatRange(e)}</span>
           <span class="pe-text">${bits.join(' · ')}</span>
           ${e.photo ? `<img class="pe-thumb" src="${e.photo}" alt="">` : ''}
+          <button type="button" class="pe-edit" data-id="${e.id}">수정</button>
           <button type="button" class="pe-remove" data-id="${e.id}">삭제</button>
         </li>
       `;
     }).join('');
+    ul.querySelectorAll('.pe-edit').forEach(btn=>{
+      btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id));
+    });
     ul.querySelectorAll('.pe-remove').forEach(btn=>{
       btn.addEventListener('click', ()=> removeEntry(btn.dataset.id));
     });
@@ -539,6 +603,7 @@
     }
     const sorted = [...entries].sort((a,b)=> a.startDate.localeCompare(b.startDate));
     wrap.innerHTML = sorted.map(e=> timelineItemHtml(e, false)).join('');
+    wrap.querySelectorAll('.tl-edit').forEach(btn=> btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-remove').forEach(btn=> btn.addEventListener('click', ()=> removeEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-visit-btn').forEach(btn=> btn.addEventListener('click', ()=> markVisited(btn.dataset.id)));
   }
@@ -551,6 +616,7 @@
       return;
     }
     wrap.innerHTML = planned.map(e=> timelineItemHtml(e, true)).join('');
+    wrap.querySelectorAll('.tl-edit').forEach(btn=> btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-remove').forEach(btn=> btn.addEventListener('click', ()=> removeEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-visit-btn').forEach(btn=> btn.addEventListener('click', ()=> markVisited(btn.dataset.id)));
   }
@@ -571,6 +637,7 @@
           ${e.photo ? `<img class="tl-photo" src="${e.photo}" alt="">` : ''}
           <div class="tl-actions">
             ${(showVisitAction || e.status==='planned') ? `<button type="button" class="tl-visit-btn" data-id="${e.id}">다녀왔어요로 변경</button>` : ''}
+            <button type="button" class="tl-edit" data-id="${e.id}">수정</button>
             <button type="button" class="tl-remove" data-id="${e.id}">삭제</button>
           </div>
         </div>
@@ -763,7 +830,7 @@
     const submitBtn = ev.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     try{
-      let photoUrl = null;
+      let photoUrl = existingPhotoUrl || null;
       if(pendingPhotoBlob) photoUrl = await uploadPhoto(pendingPhotoBlob);
 
       const row = {
@@ -783,12 +850,25 @@
         cost_other: costs.other,
         photo_url: photoUrl
       };
-      const { data, error } = await sb.from('entries').insert(row).select().single();
-      if(error) throw error;
 
-      entries.push(rowToEntry(data));
+      if(editingEntryId){
+        const idx = entries.findIndex(e=> e.id===editingEntryId);
+        const prevPhoto = idx !== -1 ? entries[idx].photo : null;
+        const { data, error } = await sb.from('entries').update(row).eq('id', editingEntryId).select().single();
+        if(error) throw error;
+        if(pendingPhotoBlob && prevPhoto && prevPhoto !== photoUrl) await deletePhoto(prevPhoto);
+        if(idx !== -1) entries[idx] = rowToEntry(data); else entries.push(rowToEntry(data));
+      }else{
+        const { data, error } = await sb.from('entries').insert(row).select().single();
+        if(error) throw error;
+        entries.push(rowToEntry(data));
+      }
+
       ev.target.reset();
       pendingPhotoBlob = null;
+      existingPhotoUrl = null;
+      editingEntryId = null;
+      submitBtn.textContent = ADD_BTN_TEXT;
       const preview = document.getElementById('photo-preview');
       if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
       preview.hidden = true;
