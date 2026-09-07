@@ -42,6 +42,14 @@
     flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:10px;
     padding:10px 14px;background:var(--card);border-bottom:1px solid var(--rule);
   }
+  .status-banner{
+    flex-shrink:0;display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:9px 14px;font-size:0.8rem;line-height:1.4;background:var(--teal);color:#fff;
+  }
+  .status-banner[hidden]{display:none;}
+  .status-banner.error{background:var(--danger);}
+  .status-banner span{flex:1;}
+  .status-banner button{background:none;border:none;color:inherit;font-size:1rem;line-height:1;cursor:pointer;padding:2px 6px;flex-shrink:0;}
   .topbar h1{font-family:'Fraunces',serif;font-weight:700;font-size:1.05rem;margin:0;white-space:nowrap;}
   .topbar-right{display:flex;align-items:center;gap:8px;position:relative;}
   .icon-btn{

@@ -783,6 +783,26 @@
     if(currentCountryPicker) renderPanelEntriesForCountry(currentCountryPicker);
   }
 
+  // ---------- 화면 안 상태 배너 (alert() 대신) ----------
+  // iOS 홈 화면 PWA(스탠드얼론) 모드에서는 alert()가 아예 뜨지 않는 경우가 있어,
+  // 저장/삭제/변경 성공·실패를 항상 화면 안 배너로 보여준다.
+  const statusBanner = document.getElementById('status-banner');
+  const statusBannerText = document.getElementById('status-banner-text');
+  let statusBannerTimer = null;
+  function showStatusBanner(text, isError){
+    clearTimeout(statusBannerTimer);
+    statusBannerText.textContent = text;
+    statusBanner.classList.toggle('error', !!isError);
+    statusBanner.hidden = false;
+    if(!isError){
+      statusBannerTimer = setTimeout(()=>{ statusBanner.hidden = true; }, 3500);
+    }
+  }
+  document.getElementById('status-banner-close').addEventListener('click', ()=>{
+    clearTimeout(statusBannerTimer);
+    statusBanner.hidden = true;
+  });
+
   async function removeEntry(id){
     const target = entries.find(e=> e.id===id);
     try{
@@ -791,9 +811,10 @@
       if(target && target.photo) await deletePhoto(target.photo);
       entries = entries.filter(e=> e.id!==id);
       refresh();
+      showStatusBanner('삭제했어요.', false);
     }catch(err){
       console.error('삭제 실패', err);
-      alert('삭제하지 못했어요: ' + err.message);
+      showStatusBanner('삭제하지 못했어요: ' + err.message, true);
     }
   }
   async function markVisited(id){
@@ -804,15 +825,19 @@
       if(error) throw error;
       e.status = 'visited';
       refresh();
+      showStatusBanner('다녀왔어요로 바꿨어요.', false);
     }catch(err){
       console.error('변경 실패', err);
-      alert('변경하지 못했어요: ' + err.message);
+      showStatusBanner('변경하지 못했어요: ' + err.message, true);
     }
   }
 
   document.getElementById('panel-form').addEventListener('submit', async (ev)=>{
     ev.preventDefault();
-    if(!currentRegion) return;
+    if(!currentRegion){
+      showStatusBanner('어느 지역인지 확인하지 못했어요. 패널을 닫고 다시 열어주세요.', true);
+      return;
+    }
     const status = document.querySelector('input[name="panel-status"]:checked').value;
     const startDate = document.getElementById('panel-start').value;
     const endDateRaw = document.getElementById('panel-end').value;
@@ -825,8 +850,12 @@
       food: Number(document.getElementById('panel-cost-food').value) || 0,
       other: Number(document.getElementById('panel-cost-other').value) || 0
     };
-    if(!startDate) return;
+    if(!startDate){
+      showStatusBanner('시작일을 입력해주세요.', true);
+      return;
+    }
 
+    const wasEditing = !!editingEntryId;
     const submitBtn = ev.target.querySelector('button[type="submit"]');
     submitBtn.disabled = true;
     try{
@@ -873,9 +902,10 @@
       if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
       preview.hidden = true;
       refresh();
+      showStatusBanner(wasEditing ? '수정했어요.' : '저장했어요.', false);
     }catch(err){
       console.error('기록 저장 실패', err);
-      alert('기록을 저장하지 못했어요: ' + err.message);
+      showStatusBanner('기록을 저장하지 못했어요: ' + err.message, true);
     }finally{
       submitBtn.disabled = false;
     }
