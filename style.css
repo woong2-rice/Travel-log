@@ -159,6 +159,7 @@
   #panel-state-picker{margin-bottom:14px;}
 
   #panel-form{display:grid;grid-template-columns:1fr 1fr;gap:12px;}
+  #panel-form[hidden]{display:none;}
   .status-toggle{display:flex;gap:8px;}
   .radio-pill{
     display:inline-flex;align-items:center;gap:6px;padding:8px 14px;border:1px solid var(--rule);
