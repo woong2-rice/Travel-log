@@ -15,7 +15,8 @@
   let entries = [];
   let userId = null;
   let currentRegion = null;
-  let currentCountryPicker = null;
+  let currentZoomCountry = null;
+  let currentZoomRegions = null;
   let pendingPhotoBlob = null;
   let editingEntryId = null;
   let existingPhotoUrl = null;
@@ -128,10 +129,12 @@
   }
 
   function regionInfo(scope, id){
-    const visited = entries.filter(e=> e.scope===scope && e.regionId===id && e.status!=='planned').length;
+    const visited = entries.filter(e=> e.scope===scope && e.regionId===id && e.status==='visited').length;
     const planned = entries.filter(e=> e.scope===scope && e.regionId===id && e.status==='planned').length;
+    const wishlist = entries.filter(e=> e.scope===scope && e.regionId===id && e.status==='wishlist').length;
     if(visited>0) return { mode:'visited', fill: colorForCount(visited).fill };
     if(planned>0) return { mode:'planned' };
+    if(wishlist>0) return { mode:'wishlist' };
     return { mode:'none' };
   }
 
@@ -139,13 +142,24 @@
     if(info.mode==='visited'){
       pathEl.style.fill = info.fill;
       pathEl.style.strokeDasharray = '';
+      pathEl.style.stroke = '';
     }else if(info.mode==='planned'){
       pathEl.style.fill = 'url(#hatch-planned)';
       pathEl.style.strokeDasharray = '2,1.5';
+      pathEl.style.stroke = '';
+    }else if(info.mode==='wishlist'){
+      pathEl.style.fill = '';
+      pathEl.style.strokeDasharray = '3,2';
+      pathEl.style.stroke = 'var(--ink-soft)';
     }else{
       pathEl.style.fill = '';
       pathEl.style.strokeDasharray = '';
+      pathEl.style.stroke = '';
     }
+  }
+
+  function cmpDate(a, b){
+    return (a||'').localeCompare(b||'');
   }
 
   // entries 테이블: 기록 하나당 한 행. 사진은 trip-photos Storage 버킷에 올리고
@@ -340,8 +354,10 @@
     const counts = {};
     entries.filter(e=>e.scope==='world').forEach(e=>{
       const key = chipCountryOf(e);
-      if(!counts[key]) counts[key] = {name:key, visited:0, planned:0};
-      if(e.status==='planned') counts[key].planned++; else counts[key].visited++;
+      if(!counts[key]) counts[key] = {name:key, visited:0, planned:0, wishlist:0};
+      if(e.status==='planned') counts[key].planned++;
+      else if(e.status==='wishlist') counts[key].wishlist++;
+      else counts[key].visited++;
     });
     const names = Object.keys(counts);
     const wrap = document.getElementById('country-chips');
@@ -352,7 +368,8 @@
         const c = counts[name];
         let style;
         if(c.visited>0){ const cc = colorForCount(c.visited); style = `background:${cc.fill};color:${cc.text};`; }
-        else style = `background:repeating-linear-gradient(45deg,#FBF8F1,#FBF8F1 3px,#C08A3E 3px,#C08A3E 5px);color:var(--ink);`;
+        else if(c.planned>0){ style = `background:repeating-linear-gradient(45deg,#FBF8F1,#FBF8F1 3px,#C08A3E 3px,#C08A3E 5px);color:var(--ink);`; }
+        else{ style = `background:var(--card);border:1px dashed var(--ink-soft);color:var(--ink-soft);`; }
         return `<button type="button" class="chip" data-name="${escapeHtml(name)}" style="${style}">${escapeHtml(name)}</button>`;
       }).join('');
       wrap.querySelectorAll('.chip').forEach(btn=>{
@@ -374,75 +391,90 @@
   }
 
   // A country name (typed, or from a mobile chip) resolves to either:
-  // - a state picker (if that country has subdivided regions), or
-  // - a direct panel open on the matching country-level regionId, or
-  // - a best-effort fallback for names we don't recognize at all.
+  // - a zoomed map of that country's states (if it has subdivided regions), or
+  // - a zoomed map of the single country shape, or
+  // - a best-effort fallback (direct panel open) for names we don't recognize at all.
   function startCountryFlow(countryNameKo){
     if(SUBDIVIDED_STATES[countryNameKo]){
-      openStatePicker(countryNameKo);
+      openCountryZoomMap(countryNameKo, WORLD_MAP.filter(r=> r.kind==='state' && r.country===countryNameKo));
     }else if(COUNTRY_TO_ID[countryNameKo]){
-      openPanel('world', COUNTRY_TO_ID[countryNameKo], countryNameKo);
+      const region = WORLD_MAP.find(r=> r.kind==='country' && r.id===COUNTRY_TO_ID[countryNameKo]);
+      if(region) openCountryZoomMap(countryNameKo, [region]);
+      else openPanel('world', COUNTRY_TO_ID[countryNameKo], countryNameKo);
     }else{
       openPanel('world', countryNameKo.toLowerCase(), countryNameKo);
     }
   }
 
-  function openStatePicker(countryNameKo){
-    currentRegion = null;
-    currentCountryPicker = countryNameKo;
-    document.getElementById('panel-region-name').textContent = countryNameKo;
-    document.getElementById('region-panel').hidden = false;
-    document.getElementById('panel-form').hidden = true;
-    document.getElementById('panel-state-picker').hidden = false;
-    renderPanelEntriesForCountry(countryNameKo);
-
-    const states = SUBDIVIDED_STATES[countryNameKo];
-    const sel = document.getElementById('panel-state-select');
-    sel.innerHTML = '<option value="">지역 선택…</option>' +
-      states.map(s=> `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
-    const recent = entries.filter(e=> e.scope==='world' && chipCountryOf(e)===countryNameKo)
-                           .sort((a,b)=> b.startDate.localeCompare(a.startDate))[0];
-    if(recent) sel.value = recent.regionId;
-
-    document.getElementById('panel-state-confirm').onclick = ()=>{
-      const id = sel.value;
-      if(!id) return;
-      const stateOnly = sel.options[sel.selectedIndex].textContent;
-      openPanel('world', id, `${stateOnly} · ${countryNameKo}`);
-    };
+  // Extracts every "x,y" coordinate pair out of one or more SVG path `d`
+  // strings (they only ever use absolute M/L/Z commands) to compute a
+  // bounding box we can zoom the mobile country map to.
+  function bboxOfPaths(dList){
+    let minX=Infinity, minY=Infinity, maxX=-Infinity, maxY=-Infinity;
+    const re = /(-?\d+\.?\d*),(-?\d+\.?\d*)/g;
+    dList.forEach(d=>{
+      let m;
+      while((m = re.exec(d))){
+        const x = parseFloat(m[1]), y = parseFloat(m[2]);
+        if(x<minX) minX=x; if(x>maxX) maxX=x;
+        if(y<minY) minY=y; if(y>maxY) maxY=y;
+      }
+    });
+    return { minX, minY, maxX, maxY };
   }
 
-  function renderPanelEntriesForCountry(countryNameKo){
-    const list = entries.filter(e=> e.scope==='world' && chipCountryOf(e)===countryNameKo)
-                         .sort((a,b)=> a.startDate.localeCompare(b.startDate));
-    const ul = document.getElementById('panel-entries');
-    if(!list.length){
-      ul.innerHTML = '<li class="panel-empty">아직 기록이 없어요.</li>';
+  function showCountryListView(){
+    currentZoomCountry = null;
+    currentZoomRegions = null;
+    document.getElementById('country-zoom-view').hidden = true;
+    document.getElementById('country-list-view').hidden = false;
+  }
+  document.getElementById('country-zoom-back').addEventListener('click', showCountryListView);
+
+  // Renders a mobile-only zoomed-in map for one country: its subdivided
+  // states as separate tappable shapes, or a single tappable country shape.
+  // Tapping a shape opens the same add-record panel the desktop map uses.
+  function openCountryZoomMap(countryNameKo, regions){
+    if(!regions || !regions.length){
+      openPanel('world', countryNameKo.toLowerCase(), countryNameKo);
       return;
     }
-    ul.innerHTML = list.map(e=>{
-      const bits = [];
-      const stateLabel = e.regionName.includes('·') ? e.regionName.split('·')[0].trim() : e.regionName;
-      bits.push(escapeHtml(stateLabel));
-      if(e.companion) bits.push('동행 ' + escapeHtml(e.companion));
-      if(e.place) bits.push(escapeHtml(e.place));
-      if(e.status==='planned') bits.push('예정');
-      const cost = entryCostTotal(e);
-      if(cost>0) bits.push(`<span class="pe-cost">${fmtWon(cost)}</span>`);
-      return `
-        <li class="panel-entry">
-          <span class="pe-date">${formatRange(e)}</span>
-          <span class="pe-text">${bits.join(' · ')}</span>
-          <button type="button" class="pe-edit" data-id="${e.id}">수정</button>
-          <button type="button" class="pe-remove" data-id="${e.id}">삭제</button>
-        </li>
-      `;
+    currentZoomCountry = countryNameKo;
+    currentZoomRegions = regions;
+    document.getElementById('country-list-view').hidden = true;
+    document.getElementById('country-zoom-view').hidden = false;
+    document.getElementById('country-zoom-name').textContent = countryNameKo;
+    document.getElementById('country-zoom-hint').textContent =
+      regions.length > 1 ? '지역을 탭하면 기록을 추가할 수 있어요.' : '지도를 탭하면 기록을 추가할 수 있어요.';
+
+    const { minX, minY, maxX, maxY } = bboxOfPaths(regions.map(r=> r.d));
+    const w = Math.max(maxX-minX, 6), h = Math.max(maxY-minY, 6);
+    const padX = w*0.08, padY = h*0.08;
+    const svg = document.getElementById('country-zoom-svg');
+    svg.setAttribute('viewBox', `${minX-padX} ${minY-padY} ${w+padX*2} ${h+padY*2}`);
+    svg.innerHTML = regions.map(r=>{
+      return `<g class="world-region kind-${r.kind}" tabindex="0" role="button" aria-label="${escapeHtml(r.name)}" data-id="${r.id}" data-name="${r.name}">
+        <path d="${r.d}"><title>${r.name}</title></path>
+      </g>`;
     }).join('');
-    ul.querySelectorAll('.pe-edit').forEach(btn=>{
-      btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id));
+    svg.querySelectorAll('.world-region').forEach(g=>{
+      g.addEventListener('click', ()=> openPanel('world', g.dataset.id, g.dataset.name));
+      g.addEventListener('keydown', (ev)=>{
+        if(ev.key==='Enter' || ev.key===' '){
+          ev.preventDefault();
+          openPanel('world', g.dataset.id, g.dataset.name);
+        }
+      });
     });
-    ul.querySelectorAll('.pe-remove').forEach(btn=>{
-      btn.addEventListener('click', ()=> removeEntry(btn.dataset.id));
+    restyleCountryZoomMap();
+  }
+
+  function restyleCountryZoomMap(){
+    if(!currentZoomRegions) return;
+    currentZoomRegions.forEach(r=>{
+      const g = document.querySelector(`#country-zoom-svg .world-region[data-id="${r.id}"]`);
+      if(!g) return;
+      applyRegionStyle(g.querySelector('path'), regionInfo('world', r.id));
     });
   }
 
@@ -486,16 +518,24 @@
   });
 
   // ---------- Shared panel ----------
+  function updateDateFieldsVisibility(){
+    const checked = document.querySelector('input[name="panel-status"]:checked');
+    const isWishlist = checked && checked.value === 'wishlist';
+    document.querySelectorAll('.panel-date-field').forEach(el=> el.hidden = isWishlist);
+  }
+  document.querySelectorAll('input[name="panel-status"]').forEach(r=>{
+    r.addEventListener('change', updateDateFieldsVisibility);
+  });
+
   function openPanel(scope, id, name){
     currentRegion = {scope, id, name};
-    currentCountryPicker = null;
     editingEntryId = null;
     existingPhotoUrl = null;
     document.getElementById('panel-region-name').textContent = name;
     document.getElementById('panel-form').reset();
     document.getElementById('panel-form').hidden = false;
-    document.getElementById('panel-state-picker').hidden = true;
     document.querySelector('#panel-form button[type="submit"]').textContent = ADD_BTN_TEXT;
+    updateDateFieldsVisibility();
     pendingPhotoBlob = null;
     const preview = document.getElementById('photo-preview');
     if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
@@ -506,11 +546,9 @@
   }
   function closePanel(){
     currentRegion = null;
-    currentCountryPicker = null;
     editingEntryId = null;
     existingPhotoUrl = null;
     document.getElementById('region-panel').hidden = true;
-    document.getElementById('panel-state-picker').hidden = true;
     document.getElementById('panel-form').hidden = false;
     document.querySelector('#panel-form button[type="submit"]').textContent = ADD_BTN_TEXT;
   }
@@ -559,11 +597,12 @@
       preview.removeAttribute('src');
     }
     document.querySelector('#panel-form button[type="submit"]').textContent = EDIT_BTN_TEXT;
+    updateDateFieldsVisibility();
   }
   function renderPanelEntries(){
     if(!currentRegion) return;
     const list = entries.filter(e=>e.scope===currentRegion.scope && e.regionId===currentRegion.id)
-                         .sort((a,b)=> a.startDate.localeCompare(b.startDate));
+                         .sort((a,b)=> cmpDate(a.startDate, b.startDate));
     const ul = document.getElementById('panel-entries');
     if(!list.length){
       ul.innerHTML = '<li class="panel-empty">아직 기록이 없어요.</li>';
@@ -575,11 +614,12 @@
       if(e.place) bits.push(escapeHtml(e.place));
       if(e.note) bits.push(escapeHtml(e.note));
       if(e.status==='planned') bits.push('예정');
+      if(e.status==='wishlist') bits.push('위시리스트');
       const cost = entryCostTotal(e);
       if(cost>0) bits.push(`<span class="pe-cost">${fmtWon(cost)}</span>`);
       return `
         <li class="panel-entry">
-          <span class="pe-date">${formatRange(e)}</span>
+          <span class="pe-date">${e.status==='wishlist' ? '날짜 미정' : formatRange(e)}</span>
           <span class="pe-text">${bits.join(' · ')}</span>
           ${e.photo ? `<img class="pe-thumb" src="${e.photo}" alt="">` : ''}
           <button type="button" class="pe-edit" data-id="${e.id}">수정</button>
@@ -595,13 +635,29 @@
     });
   }
 
+  // ---------- Timeline search ----------
+  let timelineSearchQuery = '';
+  function matchesTimelineSearch(e, q){
+    if(!q) return true;
+    const country = e.scope==='world' ? chipCountryOf(e) : '';
+    const hay = [e.companion||'', e.regionName||'', country].join(' ').toLowerCase();
+    return hay.includes(q);
+  }
+  document.getElementById('timeline-search-input').addEventListener('input', (ev)=>{
+    timelineSearchQuery = ev.target.value;
+    renderTimeline();
+  });
+
   function renderTimeline(){
     const wrap = document.getElementById('timeline-list');
-    if(!entries.length){
-      wrap.innerHTML = '<p class="empty">아직 기록이 없어요.</p>';
+    const q = timelineSearchQuery.trim().toLowerCase();
+    const base = entries.filter(e=> e.status!=='wishlist');
+    const filtered = base.filter(e=> matchesTimelineSearch(e, q));
+    if(!filtered.length){
+      wrap.innerHTML = `<p class="empty">${q ? '검색 결과가 없어요.' : '아직 기록이 없어요.'}</p>`;
       return;
     }
-    const sorted = [...entries].sort((a,b)=> a.startDate.localeCompare(b.startDate));
+    const sorted = [...filtered].sort((a,b)=> cmpDate(a.startDate, b.startDate));
     wrap.innerHTML = sorted.map(e=> timelineItemHtml(e, false)).join('');
     wrap.querySelectorAll('.tl-edit').forEach(btn=> btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-remove').forEach(btn=> btn.addEventListener('click', ()=> removeEntry(btn.dataset.id)));
@@ -610,7 +666,7 @@
 
   function renderPlan(){
     const wrap = document.getElementById('plan-list');
-    const planned = entries.filter(e=>e.status==='planned').sort((a,b)=> a.startDate.localeCompare(b.startDate));
+    const planned = entries.filter(e=>e.status==='planned').sort((a,b)=> cmpDate(a.startDate, b.startDate));
     if(!planned.length){
       wrap.innerHTML = '<p class="empty">아직 계획이 없어요.</p>';
       return;
@@ -619,6 +675,34 @@
     wrap.querySelectorAll('.tl-edit').forEach(btn=> btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-remove').forEach(btn=> btn.addEventListener('click', ()=> removeEntry(btn.dataset.id)));
     wrap.querySelectorAll('.tl-visit-btn').forEach(btn=> btn.addEventListener('click', ()=> markVisited(btn.dataset.id)));
+  }
+
+  function wishlistItemHtml(e){
+    const scopeLabel = e.scope==='domestic' ? '국내' : '해외';
+    return `
+      <div class="wishlist-item">
+        <div class="wishlist-region">${e.regionName}<span class="tl-scope">${scopeLabel}</span></div>
+        ${e.companion ? `<div class="tl-companion">동행 ${escapeHtml(e.companion)}</div>` : ''}
+        ${e.place ? `<div class="tl-place">${escapeHtml(e.place)}</div>` : ''}
+        ${e.note ? `<div class="tl-note">${escapeHtml(e.note)}</div>` : ''}
+        <div class="tl-actions">
+          <button type="button" class="tl-edit" data-id="${e.id}">수정</button>
+          <button type="button" class="tl-remove" data-id="${e.id}">삭제</button>
+        </div>
+      </div>
+    `;
+  }
+
+  function renderWishlist(){
+    const wrap = document.getElementById('wishlist-list');
+    const list = entries.filter(e=>e.status==='wishlist').sort((a,b)=> a.regionName.localeCompare(b.regionName));
+    if(!list.length){
+      wrap.innerHTML = '<p class="empty">아직 위시리스트가 없어요.</p>';
+      return;
+    }
+    wrap.innerHTML = list.map(wishlistItemHtml).join('');
+    wrap.querySelectorAll('.tl-edit').forEach(btn=> btn.addEventListener('click', ()=> startEditEntry(btn.dataset.id)));
+    wrap.querySelectorAll('.tl-remove').forEach(btn=> btn.addEventListener('click', ()=> removeEntry(btn.dataset.id)));
   }
 
   function timelineItemHtml(e, showVisitAction){
@@ -663,8 +747,9 @@
     }).join('');
   }
   function computeStats(){
-    const visited = entries.filter(e=> e.status!=='planned');
+    const visited = entries.filter(e=> e.status==='visited');
     const planned = entries.filter(e=> e.status==='planned');
+    const wishlistCount = entries.filter(e=> e.status==='wishlist').length;
     const totalDays = visited.reduce((sum,e)=> sum + daysOf(e), 0);
     const domesticSet = new Set(visited.filter(e=>e.scope==='domestic').map(e=>e.regionId));
     const worldSet = new Set(visited.filter(e=>e.scope==='world').map(e=>e.regionId));
@@ -701,13 +786,85 @@
     const upcoming = [...planned].filter(e=> e.startDate >= todayStr).sort((a,b)=> a.startDate.localeCompare(b.startDate))[0];
 
     return {
-      tripCount: visited.length, plannedCount: planned.length,
+      tripCount: visited.length, plannedCount: planned.length, wishlistCount,
       domesticCount: domesticSet.size, worldCount: worldSet.size, totalDays,
       companionCounts, countryCounts, totalCost, cat,
       avgPerTrip: visited.length ? totalCost/visited.length : 0,
       avgPerDay: totalDays ? totalCost/totalDays : 0,
       mostRecent, upcoming
     };
+  }
+
+  function computeYearlyStats(){
+    const visited = entries.filter(e=> e.status==='visited' && e.startDate);
+    const counts = {};
+    visited.forEach(e=>{
+      const y = e.startDate.slice(0,4);
+      counts[y] = (counts[y]||0) + 1;
+    });
+    const years = Object.keys(counts).sort();
+    const thisYear = String(new Date().getFullYear());
+    const lastYear = String(new Date().getFullYear()-1);
+    const thisCount = counts[thisYear] || 0;
+    const lastCount = counts[lastYear] || 0;
+    return { counts, years, thisYear, lastYear, thisCount, lastCount, diff: thisCount - lastCount };
+  }
+
+  // ---------- CSV export ----------
+  function csvField(val){
+    const s = String(val==null ? '' : val);
+    return /[",\r\n]/.test(s) ? '"' + s.replace(/"/g,'""') + '"' : s;
+  }
+  function exportEntriesCsv(){
+    const statusLabel = { visited:'다녀옴', planned:'예정', wishlist:'위시리스트' };
+    const headers = ['시작일','종료일','구분','상태','지역','동행','세부장소','메모','숙박비','교통비','식비','기타비용','합계비용'];
+    const rows = entries.map(e=> [
+      e.startDate || '', e.endDate || '',
+      e.scope==='domestic' ? '국내' : '해외',
+      statusLabel[e.status] || e.status,
+      e.regionName, e.companion || '', e.place || '', e.note || '',
+      e.costs.lodging||0, e.costs.transport||0, e.costs.food||0, e.costs.other||0, entryCostTotal(e)
+    ]);
+    const csv = [headers, ...rows].map(row=> row.map(csvField).join(',')).join('\r\n');
+    const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `여행기록_${new Date().toISOString().slice(0,10)}.csv`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+  document.getElementById('export-csv-btn').addEventListener('click', ()=>{
+    if(!entries.length){
+      showStatusBanner('내보낼 기록이 없어요.', true);
+      return;
+    }
+    exportEntriesCsv();
+  });
+
+  function yearChartHtml(){
+    const y = computeYearlyStats();
+    if(!y.years.length) return '<p class="empty-inline">아직 다녀온 여행 기록이 없어요.</p>';
+    const maxVal = Math.max(...y.years.map(yr=> y.counts[yr]));
+    const bars = y.years.map(yr=>{
+      const h = Math.max(6, Math.round((y.counts[yr]/maxVal)*100));
+      const isThis = yr === y.thisYear;
+      return `
+        <div class="year-bar-col">
+          <span class="year-bar-val">${y.counts[yr]}</span>
+          <div class="year-bar ${isThis?'current':''}" style="height:${h}%"></div>
+          <span class="year-bar-label">${yr}</span>
+        </div>
+      `;
+    }).join('');
+    const diffClass = y.diff > 0 ? 'up' : (y.diff < 0 ? 'down' : '');
+    const diffText = y.diff > 0 ? `+${y.diff}회 증가` : (y.diff < 0 ? `${y.diff}회 감소` : '작년과 동일');
+    return `
+      <div class="year-chart">${bars}</div>
+      <p class="year-diff ${diffClass}">${y.thisYear}년 ${y.thisCount}회 · 작년(${y.lastYear}년 ${y.lastCount}회) 대비 ${diffText}</p>
+    `;
   }
 
   function renderAnalytics(){
@@ -738,6 +895,10 @@
         <div class="stat-card"><div class="stat-num">${s.totalDays}</div><div class="stat-label">총 여행일수</div></div>
       </div>
       <section class="stat-section">
+        <h3>연도별 여행 횟수</h3>
+        ${yearChartHtml()}
+      </section>
+      <section class="stat-section">
         <h3>누구와 많이 갔을까</h3>
         ${barListHtml(companionTop, companionMax, '회')}
       </section>
@@ -765,6 +926,7 @@
         <h3>기타</h3>
         <div class="misc-stats">
           <div>계획 중인 여행 <b>${s.plannedCount}건</b></div>
+          <div>위시리스트 <b>${s.wishlistCount}곳</b></div>
           ${s.mostRecent ? `<div>가장 최근 여행 <b>${escapeHtml(s.mostRecent.regionName)}</b> (${formatRange(s.mostRecent)})</div>` : ''}
           ${s.upcoming ? `<div>다음 예정 여행 <b>${escapeHtml(s.upcoming.regionName)}</b> (${formatRange(s.upcoming)})</div>` : ''}
         </div>
@@ -778,9 +940,10 @@
     renderWorldChips();
     renderTimeline();
     renderPlan();
+    renderWishlist();
     renderAnalytics();
     if(currentRegion) renderPanelEntries();
-    if(currentCountryPicker) renderPanelEntriesForCountry(currentCountryPicker);
+    restyleCountryZoomMap();
   }
 
   // ---------- 화면 안 상태 배너 (alert() 대신) ----------
@@ -850,7 +1013,7 @@
       food: Number(document.getElementById('panel-cost-food').value) || 0,
       other: Number(document.getElementById('panel-cost-other').value) || 0
     };
-    if(!startDate){
+    if(status !== 'wishlist' && !startDate){
       showStatusBanner('시작일을 입력해주세요.', true);
       return;
     }
@@ -868,8 +1031,8 @@
         region_id: currentRegion.id,
         region_name: currentRegion.name,
         status,
-        start_date: startDate,
-        end_date: (endDateRaw && endDateRaw !== startDate) ? endDateRaw : null,
+        start_date: status==='wishlist' ? null : startDate,
+        end_date: status==='wishlist' ? null : ((endDateRaw && endDateRaw !== startDate) ? endDateRaw : null),
         companion: companion || null,
         place: place || null,
         note: note || null,
@@ -894,6 +1057,7 @@
       }
 
       ev.target.reset();
+      updateDateFieldsVisibility();
       pendingPhotoBlob = null;
       existingPhotoUrl = null;
       editingEntryId = null;
@@ -936,6 +1100,7 @@
     renderDomesticMap();
     renderWorldMap();
     renderWorldChips();
+    restyleCountryZoomMap();
   }
   document.querySelectorAll('.theme-swatch').forEach(btn=>{
     btn.addEventListener('click', async ()=>{
@@ -965,9 +1130,10 @@
       document.getElementById('progress-world').hidden = scope !== 'world';
       document.querySelectorAll('.subtab-btn').forEach(b=> b.classList.toggle('active', b===btn));
       document.getElementById('map-caption').textContent = scope === 'domestic'
-        ? '시/군/구 경계까지 살린 지도예요. 다녀올수록 10단계로 짙어지고, 계획만 있으면 빗금으로 표시돼요.'
-        : '데스크톱은 지도를 확대·이동해서 클릭, 모바일은 나라 이름을 입력해서 추가해요. 일본·동남아·유럽 등 46개국은 주/도/현 단위예요.';
+        ? '시/군/구 경계까지 살린 지도예요. 다녀올수록 10단계로 짙어지고, 계획만 있으면 빗금으로, 위시리스트는 점선 테두리로 표시돼요.'
+        : '데스크톱은 지도를 확대·이동해서 클릭, 모바일은 나라를 고르면 그 나라 지도가 확대돼서 떠요. 일본·동남아·유럽 등 46개국은 주/도/현 단위예요. 위시리스트는 점선 테두리로 표시돼요.';
       closePanel();
+      if(scope !== 'world') showCountryListView();
     });
   });
 

@@ -10,8 +10,8 @@ create table if not exists public.entries (
   scope          text        not null,                       -- 'domestic' | 'world'
   region_id      text        not null,
   region_name    text        not null,
-  status         text        not null default 'visited',      -- 'visited' | 'planned'
-  start_date     date        not null,
+  status         text        not null default 'visited',      -- 'visited' | 'planned' | 'wishlist'
+  start_date     date,                                        -- 'wishlist' 기록은 날짜 없이 null
   end_date       date,
   companion      text,
   place          text,
@@ -70,3 +70,8 @@ create policy "trip-photos owner delete" on storage.objects
 
 -- ── (선택) 예전 travel_entries 테이블은 더 이상 쓰지 않습니다 ──
 -- drop table if exists public.travel_entries;
+
+-- ── 마이그레이션: 위시리스트(날짜 없는 기록) 지원 ──────────
+-- 이미 만든 테이블이 있다면 아래 한 줄을 SQL Editor에서 한 번만 실행하세요.
+-- (새로 테이블을 만드는 경우라면 위 create table 문에 이미 반영되어 있어 필요 없습니다.)
+alter table public.entries alter column start_date drop not null;
