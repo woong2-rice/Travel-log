@@ -77,7 +77,7 @@
 
   function entryCostTotal(e){
     if(!e.costs) return 0;
-    return (e.costs.lodging||0) + (e.costs.transport||0) + (e.costs.food||0) + (e.costs.other||0);
+    return (e.costs.flight||0) + (e.costs.lodging||0) + (e.costs.transport||0) + (e.costs.food||0) + (e.costs.other||0);
   }
   function fmtWon(n){
     return Math.round(n).toLocaleString('ko-KR') + '원';
@@ -86,6 +86,18 @@
     const s = new Date(e.startDate+'T00:00:00');
     const en = new Date((e.endDate||e.startDate)+'T00:00:00');
     return Math.max(1, Math.round((en-s)/86400000)+1);
+  }
+  // 비용을 하나도 입력하지 않은 여행(전부 0원)은 평균 계산에서 제외합니다.
+  function costStatsFor(list){
+    const costed = list.filter(e=> entryCostTotal(e) > 0);
+    const totalCost = costed.reduce((sum,e)=> sum + entryCostTotal(e), 0);
+    const totalDays = costed.reduce((sum,e)=> sum + daysOf(e), 0);
+    return {
+      costedCount: costed.length,
+      totalCost,
+      avgPerTrip: costed.length ? totalCost/costed.length : 0,
+      avgPerDay: totalDays ? totalCost/totalDays : 0
+    };
   }
 
   function hexToHsl(hex){
@@ -177,6 +189,7 @@
       place: r.place || '',
       note: r.note || '',
       costs: {
+        flight: r.cost_flight || 0,
         lodging: r.cost_lodging || 0,
         transport: r.cost_transport || 0,
         food: r.cost_food || 0,
@@ -527,6 +540,12 @@
     r.addEventListener('change', updateDateFieldsVisibility);
   });
 
+  // 항공료는 해외(world) 기록에만 의미가 있어서 국내 지역 패널에서는 숨깁니다.
+  function updateCostFieldsVisibility(){
+    const isWorld = currentRegion && currentRegion.scope === 'world';
+    document.querySelectorAll('.panel-flight-field').forEach(el=> el.hidden = !isWorld);
+  }
+
   function openPanel(scope, id, name){
     currentRegion = {scope, id, name};
     editingEntryId = null;
@@ -536,6 +555,7 @@
     document.getElementById('panel-form').hidden = false;
     document.querySelector('#panel-form button[type="submit"]').textContent = ADD_BTN_TEXT;
     updateDateFieldsVisibility();
+    updateCostFieldsVisibility();
     pendingPhotoBlob = null;
     const preview = document.getElementById('photo-preview');
     if(preview.dataset.objurl){ URL.revokeObjectURL(preview.dataset.objurl); delete preview.dataset.objurl; }
@@ -581,6 +601,7 @@
     document.getElementById('panel-companion').value = entry.companion || '';
     document.getElementById('panel-place').value = entry.place || '';
     document.getElementById('panel-note').value = entry.note || '';
+    document.getElementById('panel-cost-flight').value = entry.costs.flight || '';
     document.getElementById('panel-cost-lodging').value = entry.costs.lodging || '';
     document.getElementById('panel-cost-transport').value = entry.costs.transport || '';
     document.getElementById('panel-cost-food').value = entry.costs.food || '';
@@ -598,6 +619,7 @@
     }
     document.querySelector('#panel-form button[type="submit"]').textContent = EDIT_BTN_TEXT;
     updateDateFieldsVisibility();
+    updateCostFieldsVisibility();
   }
   function renderPanelEntries(){
     if(!currentRegion) return;
@@ -769,16 +791,19 @@
       countryCounts[c] = (countryCounts[c]||0) + 1;
     });
 
-    const cat = {lodging:0, transport:0, food:0, other:0};
+    const cat = {flight:0, lodging:0, transport:0, food:0, other:0};
     visited.forEach(e=>{
       if(e.costs){
+        cat.flight += e.costs.flight||0;
         cat.lodging += e.costs.lodging||0;
         cat.transport += e.costs.transport||0;
         cat.food += e.costs.food||0;
         cat.other += e.costs.other||0;
       }
     });
-    const totalCost = cat.lodging + cat.transport + cat.food + cat.other;
+    const totalCost = cat.flight + cat.lodging + cat.transport + cat.food + cat.other;
+    const domesticCost = costStatsFor(visited.filter(e=>e.scope==='domestic'));
+    const worldCost = costStatsFor(visited.filter(e=>e.scope==='world'));
 
     const sortedAsc = [...visited].sort((a,b)=> a.startDate.localeCompare(b.startDate));
     const mostRecent = sortedAsc[sortedAsc.length-1];
@@ -788,9 +813,7 @@
     return {
       tripCount: visited.length, plannedCount: planned.length, wishlistCount,
       domesticCount: domesticSet.size, worldCount: worldSet.size, totalDays,
-      companionCounts, countryCounts, totalCost, cat,
-      avgPerTrip: visited.length ? totalCost/visited.length : 0,
-      avgPerDay: totalDays ? totalCost/totalDays : 0,
+      companionCounts, countryCounts, totalCost, cat, domesticCost, worldCost,
       mostRecent, upcoming
     };
   }
@@ -817,13 +840,13 @@
   }
   function exportEntriesCsv(){
     const statusLabel = { visited:'다녀옴', planned:'예정', wishlist:'위시리스트' };
-    const headers = ['시작일','종료일','구분','상태','지역','동행','세부장소','메모','숙박비','교통비','식비','기타비용','합계비용'];
+    const headers = ['시작일','종료일','구분','상태','지역','동행','세부장소','메모','항공료','숙박비','교통비','식비','기타비용','합계비용'];
     const rows = entries.map(e=> [
       e.startDate || '', e.endDate || '',
       e.scope==='domestic' ? '국내' : '해외',
       statusLabel[e.status] || e.status,
       e.regionName, e.companion || '', e.place || '', e.note || '',
-      e.costs.lodging||0, e.costs.transport||0, e.costs.food||0, e.costs.other||0, entryCostTotal(e)
+      e.costs.flight||0, e.costs.lodging||0, e.costs.transport||0, e.costs.food||0, e.costs.other||0, entryCostTotal(e)
     ]);
     const csv = [headers, ...rows].map(row=> row.map(csvField).join(',')).join('\r\n');
     const blob = new Blob(['﻿' + csv], { type:'text/csv;charset=utf-8;' });
@@ -875,8 +898,8 @@
     const countryTop = topEntries(s.countryCounts, 5);
     const countryMax = countryTop.length ? countryTop[0][1] : 1;
 
-    const catLabels = {lodging:'숙박', transport:'교통', food:'식비', other:'기타'};
-    const catColors = {lodging:'var(--teal)', transport:'var(--mustard)', food:'#8A9A6B', other:'var(--ink-soft)'};
+    const catLabels = {flight:'항공', lodging:'숙박', transport:'교통', food:'식비', other:'기타'};
+    const catColors = {flight:'#5C7FA3', lodging:'var(--teal)', transport:'var(--mustard)', food:'#8A9A6B', other:'var(--ink-soft)'};
     let acc = 0;
     const gradParts = [];
     const denom = s.totalCost || 1;
@@ -915,11 +938,24 @@
               ${Object.keys(catLabels).map(k=> `<div class="legend-row"><span class="legend-dot" style="background:${catColors[k]}"></span>${catLabels[k]} · ${fmtWon(s.cat[k])}</div>`).join('')}
             </div>
           </div>
-          <div class="cost-figures">
-            <div><span class="cf-label">총 지출</span><span class="cf-value">${fmtWon(s.totalCost)}</span></div>
-            <div><span class="cf-label">여행당 평균</span><span class="cf-value">${fmtWon(s.avgPerTrip)}</span></div>
-            <div><span class="cf-label">1일 평균</span><span class="cf-value">${fmtWon(s.avgPerDay)}</span></div>
+          <div class="cost-scope-block">
+            <h4 class="cost-scope-title">국내</h4>
+            <div class="cost-figures">
+              <div><span class="cf-label">총 지출</span><span class="cf-value">${fmtWon(s.domesticCost.totalCost)}</span></div>
+              <div><span class="cf-label">여행당 평균</span><span class="cf-value">${fmtWon(s.domesticCost.avgPerTrip)}</span></div>
+              <div><span class="cf-label">1일 평균</span><span class="cf-value">${fmtWon(s.domesticCost.avgPerDay)}</span></div>
+            </div>
           </div>
+          <div class="cost-scope-block">
+            <h4 class="cost-scope-title">해외</h4>
+            <div class="cost-figures">
+              <div><span class="cf-label">총 지출</span><span class="cf-value">${fmtWon(s.worldCost.totalCost)}</span></div>
+              <div><span class="cf-label">여행당 평균</span><span class="cf-value">${fmtWon(s.worldCost.avgPerTrip)}</span></div>
+              <div><span class="cf-label">1일 평균</span><span class="cf-value">${fmtWon(s.worldCost.avgPerDay)}</span></div>
+            </div>
+          </div>
+          ${(s.tripCount - s.domesticCost.costedCount - s.worldCost.costedCount) > 0
+            ? '<p class="empty-inline">비용을 하나도 입력하지 않은 여행은 평균 계산에서 제외했어요.</p>' : ''}
         ` : '<p class="empty-inline">아직 입력된 비용이 없어요. 기록 추가할 때 비용을 넣어보세요.</p>'}
       </section>
       <section class="stat-section">
@@ -1008,6 +1044,7 @@
     const place = document.getElementById('panel-place').value.trim();
     const note = document.getElementById('panel-note').value.trim();
     const costs = {
+      flight: currentRegion.scope==='world' ? (Number(document.getElementById('panel-cost-flight').value) || 0) : 0,
       lodging: Number(document.getElementById('panel-cost-lodging').value) || 0,
       transport: Number(document.getElementById('panel-cost-transport').value) || 0,
       food: Number(document.getElementById('panel-cost-food').value) || 0,
@@ -1036,6 +1073,7 @@
         companion: companion || null,
         place: place || null,
         note: note || null,
+        cost_flight: costs.flight,
         cost_lodging: costs.lodging,
         cost_transport: costs.transport,
         cost_food: costs.food,

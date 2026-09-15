@@ -16,6 +16,7 @@ create table if not exists public.entries (
   companion      text,
   place          text,
   note           text,
+  cost_flight    integer     default 0,                       -- 해외(world) 기록에만 쓰는 항공료
   cost_lodging   integer     default 0,
   cost_transport integer     default 0,
   cost_food      integer     default 0,
@@ -75,3 +76,7 @@ create policy "trip-photos owner delete" on storage.objects
 -- 이미 만든 테이블이 있다면 아래 한 줄을 SQL Editor에서 한 번만 실행하세요.
 -- (새로 테이블을 만드는 경우라면 위 create table 문에 이미 반영되어 있어 필요 없습니다.)
 alter table public.entries alter column start_date drop not null;
+
+-- ── 마이그레이션: 항공료(cost_flight) 컬럼 추가 ──────────────
+-- 이미 만든 테이블이 있다면 아래 한 줄을 SQL Editor에서 한 번만 실행하세요.
+alter table public.entries add column if not exists cost_flight integer default 0;

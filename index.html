@@ -62,7 +62,7 @@
         <button type="button" id="theme-btn" class="icon-btn" aria-label="색상 테마 선택">🎨</button>
         <div id="theme-popover" class="theme-popover" hidden>
           <button type="button" class="theme-swatch active" data-theme="teal" style="background:#3D7068" title="틸(기본)"></button>
-          <button type="button" class="theme-swatch" data-theme="black" style="background:#33383D" title="블랙"></button>
+          <button type="button" class="theme-swatch" data-theme="black" style="background:#9AA0A6" title="블랙"></button>
           <button type="button" class="theme-swatch" data-theme="pink" style="background:#B8607A" title="핑크"></button>
           <button type="button" class="theme-swatch" data-theme="blue" style="background:#3D5A80" title="블루"></button>
           <button type="button" class="theme-swatch" data-theme="skyblue" style="background:#5FA8D3" title="스카이블루"></button>
@@ -212,6 +212,10 @@
           <div class="field" style="grid-column:1/-1">
             <label for="panel-note">메모 (선택)</label>
             <input id="panel-note" type="text" placeholder="짧은 한마디">
+          </div>
+          <div class="field panel-flight-field" hidden>
+            <label for="panel-cost-flight">항공료 (선택, 원)</label>
+            <input id="panel-cost-flight" type="number" min="0" step="1000" placeholder="0">
           </div>
           <div class="field">
             <label for="panel-cost-lodging">숙박비 (선택, 원)</label>
