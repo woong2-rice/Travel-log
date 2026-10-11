@@ -1191,6 +1191,41 @@
     authMsg.classList.toggle('error', !!isError);
     authMsg.textContent = text;
   }
+  // Supabase 인증 에러를 원인별로 나눠 사용자에게 보여줄 문구로 바꾼다.
+  // 네트워크 단계에서 실패하면(오프라인, 프로젝트 일시정지 등) supabase-js는
+  // status 없이(또는 0) AuthRetryableFetchError를 돌려준다.
+  function describeAuthError(error, step){
+    const status = error.status || 0;
+    const code = error.code || '';
+    const msg = (error.message || '').toLowerCase();
+    if(!navigator.onLine){
+      return '인터넷에 연결되어 있지 않아요. 네트워크를 확인한 뒤 다시 시도해 주세요.';
+    }
+    if(error.name === 'AuthRetryableFetchError' || status === 0 || msg.includes('failed to fetch') || msg.includes('load failed')){
+      return '서버에 연결할 수 없어요(서비스 일시정지 가능성). 잠시 후 다시 시도하고, 계속되면 관리자에게 알려 주세요.';
+    }
+    if(status === 429 || code.includes('rate_limit')){
+      return step === 'send'
+        ? '요청이 너무 잦아요. 1분쯤 기다렸다가 다시 코드를 받아 주세요.'
+        : '시도가 너무 많아요. 잠시 후 다시 입력해 주세요.';
+    }
+    if(status >= 500){
+      return '서버에 일시적인 문제가 있어요(서비스 일시정지 가능성). 잠시 후 다시 시도해 주세요.';
+    }
+    if(step === 'send'){
+      if(code === 'email_address_invalid' || code === 'validation_failed' || msg.includes('invalid')){
+        return '이메일 주소 형식이 올바르지 않아요. 다시 확인해 주세요.';
+      }
+      if(code === 'signup_disabled' || code === 'otp_disabled'){
+        return '현재 새 로그인/가입이 막혀 있어요. 관리자에게 문의해 주세요.';
+      }
+      return '코드를 보내지 못했어요: ' + error.message;
+    }
+    if(code === 'otp_expired' || msg.includes('expired')){
+      return '코드가 만료됐거나 올바르지 않아요. 다시 확인하거나 새 코드를 받아 주세요.';
+    }
+    return '코드를 확인하지 못했어요: ' + error.message;
+  }
   function showEmailStep(){
     pendingEmail = null;
     authCodeForm.hidden = true;
@@ -1232,10 +1267,16 @@
     btn.disabled = true;
     showMsg('보내는 중…');
     // emailRedirectTo를 넘기지 않으면 매직링크 대신 코드가 메일로 전송된다.
-    const { error } = await sb.auth.signInWithOtp({ email });
+    let error;
+    try{
+      ({ error } = await sb.auth.signInWithOtp({ email }));
+    }catch(err){
+      error = err; // 예상 밖의 예외도 네트워크 오류로 분류되도록 그대로 넘긴다
+    }
     btn.disabled = false;
     if(error){
-      showMsg('보내지 못했어요: ' + error.message, true);
+      console.error('signInWithOtp failed', error);
+      showMsg(describeAuthError(error, 'send'), true);
     }else{
       showCodeStep(email);
       showMsg(email + ' 로 8자리 코드를 보냈어요. 메일함을 확인하세요.');
@@ -1251,10 +1292,16 @@
     const btn = document.getElementById('auth-verify');
     btn.disabled = true;
     showMsg('확인 중…');
-    const { error } = await sb.auth.verifyOtp({ email: pendingEmail, token, type: 'email' });
+    let error;
+    try{
+      ({ error } = await sb.auth.verifyOtp({ email: pendingEmail, token, type: 'email' }));
+    }catch(err){
+      error = err;
+    }
     btn.disabled = false;
     if(error){
-      showMsg('코드가 올바르지 않아요: ' + error.message, true);
+      console.error('verifyOtp failed', error);
+      showMsg(describeAuthError(error, 'verify'), true);
     }
     // 성공하면 onAuthStateChange(SIGNED_IN)가 enterApp을 호출한다.
   });

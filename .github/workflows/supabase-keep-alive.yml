@@ -1,0 +1,42 @@
+# Supabase 무료 프로젝트는 7일 동안 요청이 없으면 자동 일시정지된다.
+# 3일마다 entries 테이블에 가벼운 select(limit 1)를 보내 활동 기록을 남긴다.
+# URL·키는 저장소 Settings > Secrets and variables > Actions 의
+# SUPABASE_URL, SUPABASE_ANON_KEY 에서 읽는다.
+name: Supabase keep-alive
+
+on:
+  schedule:
+    # 매월 1·4·7·…일 03:17 UTC (한국시간 12:17). 정각은 GitHub 대기열이 몰려 피함.
+    - cron: '17 3 */3 * *'
+  workflow_dispatch: # Actions 탭에서 수동 실행 가능
+
+permissions:
+  contents: read
+
+jobs:
+  ping:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Ping Supabase (entries select limit 1)
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+        run: |
+          if [ -z "$SUPABASE_URL" ] || [ -z "$SUPABASE_ANON_KEY" ]; then
+            echo "::error::SUPABASE_URL 또는 SUPABASE_ANON_KEY Secret이 등록되지 않았습니다."
+            exit 1
+          fi
+          # RLS 때문에 비로그인 요청은 빈 배열([])을 받지만, DB까지 쿼리가 도달하므로 활동으로 집계된다.
+          status=$(curl -sS -o response.txt -w '%{http_code}' \
+            --retry 3 --retry-delay 10 --retry-all-errors \
+            "${SUPABASE_URL%/}/rest/v1/entries?select=id&limit=1" \
+            -H "apikey: $SUPABASE_ANON_KEY" \
+            -H "Authorization: Bearer $SUPABASE_ANON_KEY")
+          echo "HTTP $status"
+          if [ "$status" != "200" ]; then
+            echo "::error::Supabase 응답이 200이 아닙니다 (HTTP $status). 프로젝트가 이미 일시정지됐다면 대시보드에서 Restore 하세요."
+            head -c 500 response.txt
+            exit 1
+          fi
+          echo "Supabase keep-alive OK"
