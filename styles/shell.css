@@ -1,0 +1,91 @@
+/* ==========================================================================
+   shell — 화면 틀: 하단 탭 바, 공통 화면 머리, 토스트, 태그, 접힘 섹션, 빈 상태
+   ========================================================================== */
+
+.app { min-height: 100dvh; }
+.views { padding-bottom: calc(var(--nav-h) + env(safe-area-inset-bottom)); }
+
+/* 지도가 아닌 화면: 가운데 정렬된 한 열 */
+.view:not(.view--map) {
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: calc(env(safe-area-inset-top) + 28px) var(--margin) 48px;
+}
+.view__head { margin-bottom: 24px; }
+.view__title { font-size: var(--fs-title); font-weight: 700; line-height: 1.25; letter-spacing: -0.01em; }
+.view__sub { margin-top: 6px; max-width: 60ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+
+/* ---- 하단 탭 바: 지도 · 연표 · 분석 · 설정 ---- */
+.tabbar {
+  position: fixed; inset: auto 0 0 0; z-index: 50;   /* 시트보다 위: 시트는 탭 바 뒤로 내려간다 */
+  padding-bottom: env(safe-area-inset-bottom);
+  background: var(--paper);
+  border-top: 1px solid var(--border);
+  transition: background-color var(--dur) var(--ease-out), border-color var(--dur);
+}
+.tabbar__inner {
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  max-width: 520px; height: var(--nav-h); margin: 0 auto;
+}
+.tabbar__item {
+  display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 4px;
+  min-height: 44px; color: var(--faint); text-decoration: none;
+  font-size: var(--fs-small); font-weight: 500;
+  transition: color 160ms var(--ease-out);
+}
+.tabbar__item .icon { width: 22px; height: 22px; }
+.tabbar__item:hover { color: var(--ink); }
+.tabbar__item[aria-current="page"] { color: var(--ink); font-weight: 600; }
+.tabbar__item[aria-current="page"] .icon { stroke-width: 1.9; }
+
+/* ---- 태그 (상태 표시): 옅은 바탕 + 같은 색 진한 글자 ---- */
+.tag {
+  flex: none; display: inline-flex; align-items: center;
+  height: 22px; padding: 0 8px; border-radius: 4px;
+  font-size: 12px; font-weight: 500; white-space: nowrap;
+}
+.tag--planned { background: rgb(var(--accent-rgb) / 0.16); color: color-mix(in srgb, var(--accent) 70%, var(--ink)); }
+.tag--wishlist { background: var(--raised); color: var(--muted); }
+
+/* ---- 접힘/펼침 섹션 (기록 폼) ---- */
+.disclosure { border-top: 1px solid var(--rule); }
+.disclosure__summary {
+  display: flex; align-items: center; gap: 12px;
+  min-height: 52px; cursor: pointer; list-style: none;
+}
+.disclosure__summary::-webkit-details-marker { display: none; }
+.disclosure__title { flex: none; font-weight: 600; }
+.disclosure__preview {
+  flex: 1; min-width: 0; text-align: right; color: var(--muted);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}
+.disclosure__chev { flex: none; width: 18px; height: 18px; color: var(--faint); transition: transform 200ms var(--ease-out); }
+.disclosure[open] .disclosure__chev { transform: rotate(90deg); }
+.disclosure__body { display: grid; gap: 14px; padding: 2px 0 20px; }
+
+/* ---- 토스트 ---- */
+.toast {
+  position: fixed; left: 50%; z-index: 60;
+  bottom: calc(var(--nav-h) + env(safe-area-inset-bottom) + 16px);
+  max-width: calc(100% - 32px); padding: 11px 16px; border-radius: var(--r-card);
+  background: var(--ink); color: var(--paper); font-size: var(--fs-body); font-weight: 500;
+  box-shadow: var(--shadow-toast);
+  transform: translate(-50%, 8px); opacity: 0;
+  transition: transform 220ms var(--ease-out), opacity 220ms var(--ease-out);
+}
+.toast.is-shown { transform: translate(-50%, 0); opacity: 1; }
+.toast--error { background: var(--negative); color: #fff; }
+
+/* ---- 빈 상태 · 시작 ---- */
+.empty { display: grid; justify-items: start; gap: 16px; padding: 24px 0; color: var(--muted); max-width: 52ch; }
+.empty-line { color: var(--muted); padding: 8px 0; }
+.boot-msg { display: grid; justify-items: center; gap: 16px; padding: 38vh 24px 0; color: var(--muted); text-align: center; }
+
+/* ---- 지역 실루엣 (썸네일) ---- */
+.glyph {
+  flex: none; display: inline-grid; place-items: center;
+  background: var(--raised); border-radius: var(--r-control); overflow: hidden;
+}
+.glyph svg { width: 78%; height: 78%; }
+.glyph path { fill: rgb(var(--accent-rgb) / 0.85); stroke: none; }
+.glyph--outline path { fill: none; stroke: var(--muted); stroke-width: 1px; vector-effect: non-scaling-stroke; }

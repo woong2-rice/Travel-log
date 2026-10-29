@@ -1,0 +1,55 @@
+/* ==========================================================================
+   settings — 구역마다 제목/설명 + 패널. 데스크톱은 두 열, 폰은 위아래
+   ========================================================================== */
+
+.view--settings.view { max-width: 960px; }
+.set-sec { display: grid; gap: 12px; padding: 24px 0; }
+.set-sec + .set-sec { border-top: 1px solid var(--rule); }
+.set-sec__title { font-size: var(--fs-section); font-weight: 600; }
+.set-sec__desc { margin-top: 4px; font-size: var(--fs-body); color: var(--muted); max-width: 40ch; }
+
+.set-panel {
+  display: grid; gap: 18px; padding: 18px 20px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card);
+}
+.set-row { display: flex; align-items: center; justify-content: space-between; gap: 16px; flex-wrap: wrap; }
+.set-row__title { font-weight: 500; }
+.set-row__title .num { font-size: 16px; }
+.set-row__desc { margin-top: 2px; font-size: 13px; color: var(--muted); }
+.set-block { display: grid; gap: 10px; }
+.set-note { color: var(--ink); }
+.set-form { display: grid; gap: 12px; }
+.set-form__row { display: flex; justify-content: space-between; align-items: center; }
+.form__msg { min-height: 1.5em; font-size: 13px; color: var(--muted); }
+.form__msg:empty { display: none; }
+
+/* 방문 횟수 색 단계 (지도 범례) */
+.ramp { display: grid; grid-template-columns: repeat(10, 1fr); gap: 2px; }
+.ramp__step { display: grid; gap: 4px; }
+.ramp__swatch { height: 22px; border-radius: 2px; box-shadow: inset 0 0 0 0.5px var(--land-line); }
+.ramp__label { text-align: center; font-size: 12px; color: var(--muted); }
+.marks { display: flex; flex-wrap: wrap; gap: 8px 20px; font-size: 13px; color: var(--muted); }
+.marks li { display: inline-flex; align-items: center; gap: 8px; }
+.mark { display: inline-block; width: 24px; height: 16px; border-radius: 2px; }
+.mark--planned { position: relative; overflow: hidden; background: var(--land); box-shadow: inset 0 0 0 0.5px var(--land-line); }
+.mark--planned::after {   /* 빗금: 테마 색을 따라가도록 색은 배경, 모양은 마스크 */
+  content: ""; position: absolute; inset: 0; background: rgb(var(--accent-rgb) / 0.6);
+  -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M-1 1l2-2M0 6l6-6M5 7l2-2' stroke='%23000' stroke-width='1.4'/%3E%3C/svg%3E") 0 0 / 6px 6px;
+          mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='6' height='6'%3E%3Cpath d='M-1 1l2-2M0 6l6-6M5 7l2-2' stroke='%23000' stroke-width='1.4'/%3E%3C/svg%3E") 0 0 / 6px 6px;
+}
+.mark--wishlist { background: var(--land); border: 1px dashed var(--muted); }
+
+@media (min-width: 900px) {
+  .set-sec { grid-template-columns: 300px 1fr; gap: 40px; padding: 32px 0; }
+}
+
+/* 테마(칠하는 색) 고르기 */
+.theme-name { margin-left: 6px; font-weight: 400; color: var(--muted); }
+.theme-swatches { display: flex; flex-wrap: wrap; gap: 10px; }
+.theme-swatch {
+  width: 32px; height: 32px; border-radius: 50%; background: var(--sw);
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.08);
+  transition: transform 120ms var(--ease-out);
+}
+.theme-swatch:hover { transform: scale(1.08); }
+.theme-swatch[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--surface), 0 0 0 4px var(--ink); }

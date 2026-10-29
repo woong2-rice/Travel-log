@@ -1,0 +1,108 @@
+/* ==========================================================================
+   map — 메인 지도 화면 (라이트)
+   ========================================================================== */
+
+.view--map {
+  position: fixed; inset: 0 0 calc(var(--nav-h) + env(safe-area-inset-bottom)) 0;
+  overflow: hidden;
+}
+.map-stage { position: absolute; inset: 0; }
+.map-svg {
+  width: 100%; height: 100%;
+  padding: calc(env(safe-area-inset-top) + 64px) 12px 72px;   /* 위 토글, 아래 칩 자리 */
+  touch-action: none; user-select: none; -webkit-user-select: none;
+  cursor: grab;
+  overflow: visible;      /* 확대하면 지도가 화면 끝까지 */
+}
+.map-svg:active { cursor: grabbing; }
+
+/* 지역: 0.5px 윤곽선은 확대해도 0.5px */
+.region {
+  fill: var(--land);
+  stroke: var(--land-line);
+  stroke-width: 0.5px;
+  vector-effect: non-scaling-stroke;
+  stroke-linejoin: round;
+  transition: fill 260ms var(--ease-out);
+  cursor: pointer;
+  outline: none;
+}
+.region[data-level="1"] { fill: var(--visit-1); }
+.region[data-level="2"] { fill: var(--visit-2); }
+.region[data-level="3"] { fill: var(--visit-3); }
+.region[data-level="4"] { fill: var(--visit-4); }
+.region[data-level="5"] { fill: var(--visit-5); }
+.region[data-level="6"] { fill: var(--visit-6); }
+.region[data-level="7"] { fill: var(--visit-7); }
+.region[data-level="8"] { fill: var(--visit-8); }
+.region[data-level="9"] { fill: var(--visit-9); }
+.region[data-level="10"] { fill: var(--visit-10); }
+.region[data-state="wishlist"] { stroke: var(--muted); stroke-width: 1px; stroke-dasharray: 2.5 2; }
+.hatch-bg { fill: var(--land); }
+.hatch-line { stroke: rgb(var(--accent-rgb) / 0.6); }
+
+@media (hover: hover) {
+  .region:hover { stroke: var(--ink); stroke-width: 1px; }
+}
+.region:focus-visible { stroke: var(--ink); stroke-width: 2px; }
+.region.is-selected { stroke: var(--map-focus); stroke-width: 1.75px; }
+
+.outline { fill: none; stroke: var(--border-line); stroke-width: 0.6px; vector-effect: non-scaling-stroke; pointer-events: none; }
+
+/* 위: 국내/해외 토글 하나 */
+.map-top {
+  position: absolute; z-index: 5; left: 50%; transform: translateX(-50%);
+  top: calc(env(safe-area-inset-top) + 14px);
+}
+.map-scope { background: var(--raised); box-shadow: inset 0 0 0 1px var(--border); }
+
+/* 아래: 왼쪽 확대 버튼, 오른쪽 진행률 칩 */
+.map-bottom {
+  position: absolute; z-index: 5; left: var(--margin); right: var(--margin); bottom: 16px;
+  display: flex; align-items: flex-end; justify-content: space-between;
+  pointer-events: none;
+}
+.map-bottom > * { pointer-events: auto; }
+.map-zoom {
+  display: flex; flex-direction: column;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-control);
+}
+.map-zoom .icon-btn { width: 40px; height: 40px; border-radius: 0; }
+.map-zoom .icon-btn + .icon-btn { border-top: 1px solid var(--rule); }
+
+.progress-chip {
+  display: inline-flex; align-items: baseline; gap: 6px;
+  height: 44px; padding: 0 16px; align-items: center;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-pill);
+  white-space: nowrap;
+}
+.chip__unit { margin-right: 4px; font-size: var(--fs-small); color: var(--muted); }
+.chip__done { font-size: 22px; font-weight: 500; color: var(--ink); line-height: 1; }
+.chip__slash { color: var(--faint); font-size: 16px; }
+.chip__total { font-size: 16px; color: var(--muted); line-height: 1; }
+
+/* 지역 찾기 */
+.map-search-btn {
+  position: absolute; z-index: 6; right: var(--margin); top: calc(env(safe-area-inset-top) + 14px);
+  background: var(--surface); border: 1px solid var(--border);
+}
+.map-search {
+  position: absolute; z-index: 7; left: var(--margin); right: var(--margin);
+  top: calc(env(safe-area-inset-top) + 62px);
+  max-width: 420px; margin: 0 auto; padding: 8px;
+  background: var(--surface); border: 1px solid var(--border); border-radius: var(--r-card);
+  box-shadow: var(--shadow-toast);
+}
+.map-search__results:not(:empty) { margin-top: 6px; }
+.map-search__item {
+  width: 100%; min-height: 44px; padding: 0 10px; border-radius: var(--r-control);
+  display: flex; align-items: center; justify-content: space-between; gap: 12px; text-align: left;
+}
+.map-search__item:hover, .map-search__item:focus-visible { background: var(--raised); }
+.map-search__parent { font-size: 13px; color: var(--muted); }
+.map-search__none { padding: 10px; color: var(--muted); font-size: 13px; }
+
+@media (min-width: 900px) {
+  .map-svg { padding: 72px 48px 56px; }
+  .map-bottom { left: 24px; right: 24px; bottom: 24px; }
+}

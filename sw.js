@@ -1,17 +1,44 @@
 /* 여행 기록장 · 서비스워커
-   - 앱 셸(HTML/CSS/JS/아이콘/지도 JSON)은 오프라인에서도 열리도록 캐시
+   - 앱 셸(HTML · styles 폴더 CSS · js 폴더 모듈 · 아이콘 · 지도 JSON)은 오프라인에서도 열리도록 캐시
    - 폰트·supabase-js CDN은 런타임 캐시(stale-while-revalidate)
    - Supabase API(인증·데이터)는 항상 네트워크로 통과시킴 (캐시 안 함) */
 
-const VERSION = 'v5';
+const VERSION = 'v6';   // 화면 전면 개편 (지도·연표·분석·설정 / ES 모듈 구조)
 const SHELL_CACHE = `travel-log-shell-${VERSION}`;
 const RUNTIME_CACHE = `travel-log-runtime-${VERSION}`;
 
 const SHELL_ASSETS = [
   './',
   'index.html',
-  'style.css',
-  'script.js',
+  'js/charts/charts.js',
+  'js/components/BottomSheet.js',
+  'js/components/EntryForm.js',
+  'js/components/MapCanvas.js',
+  'js/components/PhotoSlider.js',
+  'js/components/RegionSheet.js',
+  'js/components/controls.js',
+  'js/data/api.js',
+  'js/data/maps.js',
+  'js/data/sample.js',
+  'js/data/store.js',
+  'js/lib/dom.js',
+  'js/lib/format.js',
+  'js/lib/image.js',
+  'js/lib/panzoom.js',
+  'js/lib/theme.js',
+  'js/main.js',
+  'js/views/AnalyticsView.js',
+  'js/views/MapView.js',
+  'js/views/SettingsView.js',
+  'js/views/TimelineView.js',
+  'styles/analytics.css',
+  'styles/base.css',
+  'styles/map.css',
+  'styles/settings.css',
+  'styles/sheet.css',
+  'styles/shell.css',
+  'styles/timeline.css',
+  'styles/tokens.css',
   'manifest.json',
   'favicon.svg',
   'icon/favicon-32.png',

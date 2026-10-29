@@ -1,19 +1,48 @@
 # Travel Log · 여행 기록장
 
-시/군/구 및 세계 행정구역 지도 위에 다녀온 곳과 계획을 기록하는 앱.
-데이터는 **Supabase**에 저장되고, **이메일 8자리 코드(OTP)**로 로그인합니다.
+"다녀온 곳을 칠하고, 내 여행 인생을 결산한다."
+시/군/구 · 세계 지도 위에 다녀온 곳을 칠하고, 연표와 결산으로 돌아보는 PWA.
+빌드 도구 없는 바닐라 JS(ES 모듈) + CSS. 데이터는 **Supabase**, 로그인은 **이메일 8자리 코드(OTP)**.
+
+화면: 지도(국내/해외) · 연표 · 분석 · 설정 — 하단 탭, 해시 라우팅(`#map` `#timeline` `#analytics` `#settings`).
+로그인 전이거나 서버에 닿지 않으면 `js/data/sample.js`의 예시 기록으로 열린다.
 
 ## 구조
+```
+./
+  index.html
+  styles/
+    tokens.css     색·글꼴·크기·간격 변수 (세이지 10단계 알파 포함) — 디자인 수정은 여기서
+    base.css       리셋, 숫자 글꼴(.num), 버튼·입력·세그먼트 공용 컨트롤
+    shell.css      하단 탭 바, 화면 머리, 태그, 접힘 섹션, 토스트, 지역 실루엣
+    map.css        지도 화면 / sheet.css 바텀 시트·기록 폼
+    timeline.css   연표 / analytics.css 결산 / settings.css 설정
+  js/
+    main.js                 시작 + 해시 라우터(#map #timeline #analytics #settings)
+    lib/                    dom(h·아이콘·접힘 섹션) · format(날짜·금액) · panzoom · image · theme(칠하는 색 11가지)
+    data/
+      api.js                Supabase 연결 (기존 schema.sql 그대로)
+      store.js              상태 + 저장/삭제 action + 모든 집계 selector
+      maps.js · sample.js   지도 데이터 로딩(세계지도는 밀러 원통 도법(평면 지도)으로 다시 투영) / 예시 기록
+    components/
+      MapCanvas.js          칠하는 지도 (10단계, 계획=빗금, 가고 싶어요=점선)
+      BottomSheet.js        반/전체 높이 시트 (끌기·Esc·포커스 복귀)
+      RegionSheet.js        지역 요약 → 사진 → + 기록 추가 → 기록 목록(접힘)
+      EntryForm.js          필수(상태·날짜) 먼저, 동행·비용·사진·메모는 접힘
+      PhotoSlider.js · controls.js (세그먼트, 진행률 칩, 탭 바, 토스트, 지역 실루엣)
+    views/   MapView · TimelineView · AnalyticsView · SettingsView
+    charts/  charts.js (연도 막대, 비용 100% 막대+범례 표, 순위 목록, 시·도 진행 막대)
+  data/*.json          지도 데이터 (KR_MAP / WORLD_MAP / 국경 외곽선)
+  supabase/schema.sql  entries 테이블 + RLS + trip-photos Storage 정책
+  manifest.json · sw.js · favicon.svg · icon/   PWA
+```
 
-| 파일 | 내용 |
-|------|------|
-| `index.html` | 마크업 (로그인 화면 + 앱) |
-| `style.css` | 스타일 |
-| `script.js` | 앱 로직 · Supabase 연동 |
-| `data/*.json` | 지도 데이터 (KR_MAP / WORLD_MAP / 국경 외곽선) |
-| `supabase/schema.sql` | `entries` 테이블 + RLS + `trip-photos` Storage 정책 |
-| `manifest.json` · `sw.js` | PWA 매니페스트 · 서비스워커 |
-| `favicon.*` · `icon-*.png` · `apple-touch-icon.png` | 앱 아이콘 |
+## 규칙 (디자인 스킬에서)
+- 색은 데이터에만: 칠하는 색(기본 세이지, 설정에서 변경)은 칠한 지역·올해 막대·진행 막대에만. 버튼은 근흑색.
+- 테마는 `--accent-rgb` 하나를 바꾼다. 이전 버전에서 고른 테마(travel-app-theme)를 그대로 이어받는다.
+- 숫자는 Newsreader + 고정폭 숫자(`.num`), 한글은 Pretendard.
+- 합계는 항상 store.js selector에서 계산(화면마다 따로 세지 않음).
+- 움직임은 사용자의 동작에 답할 때만(시트 열기, 접힘, 토스트).
 
 ## PWA
 

@@ -1,0 +1,115 @@
+/* ==========================================================================
+   base — 리셋, 글꼴, 브라우저 기본 표면(선택·포커스·스크롤바), 공용 컨트롤
+   ========================================================================== */
+
+*, *::before, *::after { box-sizing: border-box; }
+html { -webkit-text-size-adjust: 100%; text-size-adjust: 100%; }
+body, h1, h2, h3, h4, p, ul, ol, dl, dd, figure { margin: 0; }
+ul, ol { padding: 0; list-style: none; }
+img, svg { display: block; max-width: 100%; }
+button, input, select, textarea { font: inherit; color: inherit; }
+button { cursor: pointer; background: none; border: 0; padding: 0; }
+[hidden] { display: none !important; }
+
+html, body { height: 100%; }
+body {
+  font-family: var(--font-sans);
+  font-size: var(--fs-body);
+  line-height: var(--lh-body);
+  color: var(--ink);
+  background-color: var(--paper);
+  -webkit-font-smoothing: antialiased;
+  word-break: keep-all;               /* 한글 어절 단위 줄바꿈 */
+  overflow-wrap: anywhere;
+  transition: background-color var(--dur) var(--ease-out), color var(--dur) var(--ease-out);
+}
+
+/* 종이 질감: 라이트 테마에서만, 아주 옅은 노이즈 */
+body {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .36 0 0 0 0 .33 0 0 0 0 .28 0 0 0 .045 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E");
+}
+
+/* 숫자는 영문 글꼴 + 고정폭 숫자 */
+.num {
+  font-family: var(--font-num);
+  font-variant-numeric: tabular-nums lining-nums;
+  font-optical-sizing: auto;
+  letter-spacing: 0;
+}
+
+.sr-only {
+  position: absolute !important; width: 1px; height: 1px; padding: 0; margin: -1px;
+  overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+}
+
+/* ---- 브라우저 표면 ---- */
+::selection { background: rgb(var(--accent-rgb) / 0.28); color: var(--ink); }
+:focus-visible { outline: 2px solid var(--ink); outline-offset: 2px; border-radius: 4px; }
+* { scrollbar-width: thin; scrollbar-color: var(--control) transparent; }
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-thumb { background: var(--control); border-radius: 8px; }
+::-webkit-scrollbar-track { background: transparent; }
+input, textarea { caret-color: var(--accent); }
+
+/* ---- 버튼 ---- */
+.btn {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  height: var(--control-h); padding: 0 16px;
+  border-radius: var(--r-control);
+  font-size: var(--fs-body); font-weight: 600; line-height: 1;
+  white-space: nowrap;
+  transition: background-color 160ms var(--ease-out), transform 120ms var(--ease-out), opacity 160ms;
+}
+.btn:active { transform: scale(0.98); }
+.btn:disabled { opacity: 0.55; cursor: progress; }
+.btn--primary { background: var(--primary); color: var(--on-primary); }
+.btn--primary:hover { background: color-mix(in srgb, var(--primary) 88%, var(--paper)); }
+.btn--secondary { background: var(--surface); color: var(--ink); box-shadow: inset 0 0 0 1px var(--control); }
+.btn--secondary:hover { background: var(--raised); }
+.btn--text { height: auto; padding: 6px 4px; font-weight: 500; color: var(--ink); }
+.btn--text:hover { text-decoration: underline; text-underline-offset: 3px; }
+.btn--danger { color: var(--negative); }
+.btn--block { width: 100%; }
+.btn--sm { height: 32px; padding: 0 12px; font-size: 13px; }
+
+.icon-btn {
+  display: inline-grid; place-items: center;
+  width: 40px; height: 40px; border-radius: var(--r-control);
+  color: var(--muted);
+}
+.icon-btn:hover { background: var(--raised); color: var(--ink); }
+.icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 1.5; stroke-linecap: round; stroke-linejoin: round; }
+
+/* ---- 입력 ---- */
+.field { display: grid; gap: 8px; }
+.field__label { font-size: var(--fs-small); font-weight: 500; color: var(--muted); }
+.input {
+  width: 100%; height: var(--control-h); padding: 0 12px;
+  background: var(--surface); border: 1px solid var(--control); border-radius: var(--r-control);
+  font-size: 16px;                    /* iOS 확대 방지 */
+  transition: border-color 160ms;
+}
+textarea.input { height: auto; min-height: 88px; padding: 10px 12px; resize: vertical; line-height: 1.5; }
+.input::placeholder { color: var(--faint); }
+.input[type="search"]::-webkit-search-cancel-button { filter: grayscale(1) opacity(0.6); }
+.input:focus { outline: none; border-color: var(--ink); }
+.input[type="date"] { font-family: var(--font-num); font-variant-numeric: tabular-nums; }
+
+/* ---- 세그먼트 컨트롤 (국내/해외, 상태 선택 등 공용) ---- */
+.segmented {
+  display: inline-flex; padding: 3px; gap: 2px;
+  background: var(--raised); border-radius: var(--r-control);
+}
+.segmented__opt {
+  min-width: 64px; height: 32px; padding: 0 14px;
+  border-radius: 4px; font-size: var(--fs-body); font-weight: 500; color: var(--muted);
+  transition: background-color 160ms var(--ease-out), color 160ms;
+}
+.segmented__opt[aria-pressed="true"], .segmented__opt[aria-checked="true"] {
+  background: var(--surface); color: var(--ink);
+  box-shadow: 0 0 0 1px var(--border);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { transition-duration: 1ms !important; animation-duration: 1ms !important; scroll-behavior: auto !important; }
+}
