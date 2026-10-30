@@ -3,7 +3,7 @@
 import { h, icon } from '../lib/dom.js';
 import { createMapCanvas } from '../components/MapCanvas.js';
 import { SegmentedToggle, ProgressChip } from '../components/controls.js';
-import { store, regionCounts, progress } from '../data/store.js';
+import { store, regionCounts, progress, ensureLoggedIn } from '../data/store.js';
 import { PROVINCES } from '../data/maps.js';
 import { splitRegionName } from '../lib/format.js';
 
@@ -62,8 +62,15 @@ export function MapView({ maps, regionSheet }) {
     if (ev.key === 'Escape') toggleSearch(false);
   });
 
+  // 로그인 전(예시 기록)이라는 표시 + 로그인 바로가기
+  const samplePill = h('button', {
+    type: 'button', class: 'sample-pill', hidden: true,
+    onClick: () => ensureLoggedIn('로그인하면 예시 대신 내 기록이 지도에 칠해져요.'),
+  }, h('span', { class: 'sample-pill__tag' }, '예시'), '로그인');
+
   const el = h('section', { class: 'view view--map', id: 'view-map', 'aria-labelledby': 'map-h' },
     h('h1', { class: 'sr-only', id: 'map-h' }, '지도'),
+    samplePill,
     h('div', { class: 'map-top' }, toggle),
     searchBtn, searchPanel,
     stage,
@@ -90,6 +97,7 @@ export function MapView({ maps, regionSheet }) {
   }
 
   function render(state) {
+    samplePill.hidden = state.mode === 'cloud';
     canvasFor(scope).paint(regionCounts(state.entries, scope));
     chip.update(progress(state.entries, scope, maps), scope);
   }

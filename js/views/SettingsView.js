@@ -6,6 +6,7 @@ import * as api from '../data/api.js';
 import { readDefaultScope, writeDefaultScope } from './MapView.js';
 import { STATUS_LABEL, costTotal, COST_KEYS } from '../lib/format.js';
 import { THEMES, readTheme, saveTheme } from '../lib/theme.js';
+import { LoginForm } from '../components/LoginForm.js';
 
 export function SettingsView({ toast }) {
   const accountPanel = h('div', { class: 'set-panel' });
@@ -18,7 +19,6 @@ export function SettingsView({ toast }) {
     panel);
 
   // ---- 계정 ----
-  let pendingEmail = null;
   function renderAccount(state) {
     if (!state.backend) {
       accountPanel.replaceChildren(h('p', {}, '서버에 연결할 수 없어 예시 기록을 보여주고 있어요. 인터넷 연결을 확인한 뒤 앱을 다시 열어 주세요.'));
@@ -31,43 +31,9 @@ export function SettingsView({ toast }) {
           h('button', { type: 'button', class: 'btn btn--secondary', onClick: () => api.signOut() }, '로그아웃')));
       return;
     }
-    const msg = h('p', { class: 'form__msg', role: 'status' });
-    const emailInput = h('input', { class: 'input', type: 'email', id: 'acc-email', autocomplete: 'email', required: true, placeholder: '이메일 주소' });
-    const codeInput = h('input', { class: 'input num', id: 'acc-code', inputmode: 'numeric', autocomplete: 'one-time-code', maxlength: '8', placeholder: '8자리 숫자' });
-
-    const emailForm = h('form', { class: 'set-form' },
-      h('label', { class: 'field', for: 'acc-email' }, h('span', { class: 'field__label' }, '이메일'), emailInput),
-      h('button', { type: 'submit', class: 'btn btn--primary' }, '로그인 코드 받기'));
-    const codeForm = h('form', { class: 'set-form', hidden: true },
-      h('label', { class: 'field', for: 'acc-code' }, h('span', { class: 'field__label' }, '메일로 받은 8자리 코드'), codeInput),
-      h('div', { class: 'set-form__row' },
-        h('button', { type: 'button', class: 'btn btn--text', onClick: () => { codeForm.hidden = true; emailForm.hidden = false; msg.textContent = ''; } }, '다른 이메일로'),
-        h('button', { type: 'submit', class: 'btn btn--primary' }, '로그인')));
-
-    emailForm.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const btn = emailForm.querySelector('button[type="submit"]');
-      btn.disabled = true; msg.textContent = '코드를 보내는 중…';
-      try {
-        await api.sendCode(emailInput.value.trim());
-        pendingEmail = emailInput.value.trim();
-        emailForm.hidden = true; codeForm.hidden = false; codeInput.focus();
-        msg.textContent = `${pendingEmail} 로 8자리 코드를 보냈어요.`;
-      } catch (err) { msg.textContent = api.describeAuthError(err, 'send'); }
-      btn.disabled = false;
-    });
-    codeForm.addEventListener('submit', async (ev) => {
-      ev.preventDefault();
-      const btn = codeForm.querySelector('button[type="submit"]');
-      btn.disabled = true; msg.textContent = '확인하는 중…';
-      try { await api.verifyCode(pendingEmail, codeInput.value.trim()); msg.textContent = ''; toast.show('로그인했어요.'); }
-      catch (err) { msg.textContent = api.describeAuthError(err, 'verify'); }
-      btn.disabled = false;
-    });
-
     accountPanel.replaceChildren(
-      h('p', { class: 'set-note' }, '지금은 예시 기록이에요. 로그인하면 내 기록이 지도에 칠해지고, 여기서 바꾼 내용이 저장돼요.'),
-      emailForm, codeForm, msg);
+      h('p', { class: 'set-note' }, '지금은 예시 기록이에요. 로그인해야 기록을 남기고 고칠 수 있어요.'),
+      LoginForm({ idPrefix: 'acc', onSuccess: () => toast.show('로그인했어요.') }));
   }
 
   // ---- 지도 ----

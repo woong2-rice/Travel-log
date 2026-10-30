@@ -44,24 +44,31 @@ async function enterCloud(session) {
   }
 }
 
+// ---------------------------------------------------------------- 로그인 확인
+// 로그인하지 않은 상태(예시 기록)에서는 아무것도 저장하지 않는다.
+// 화면은 ensureLoggedIn() 으로 먼저 묻고, 아니면 로그인 화면을 띄운다.
+let loginPrompt = null;
+export function setLoginPrompt(fn) { loginPrompt = fn; }
+export function ensureLoggedIn(reason) {
+  if (state.mode === 'cloud') return true;
+  loginPrompt?.(reason);
+  return false;
+}
+function assertCloud() {
+  if (state.mode !== 'cloud') throw new Error('로그인한 뒤에 저장할 수 있어요.');
+}
+
 // ---------------------------------------------------------------- 기록 변경
 /** draft: 기록 필드 전체, photoBlob: 새 사진, removePhoto: 사진 빼기, id: 수정할 기록 id */
 export async function saveEntry(draft, { photoBlob = null, removePhoto = false, id = null } = {}) {
   const prev = id ? state.entries.find((x) => x.id === id) : null;
   const entry = { ...draft, photo: removePhoto ? null : (prev?.photo || null) };
 
-  if (state.mode === 'cloud') {
-    const uid = state.user.id;
-    if (photoBlob) entry.photo = await api.uploadPhoto(photoBlob, uid);
-    const saved = id ? await api.updateEntry(id, entry, uid) : await api.insertEntry(entry, uid);
-    if (prev?.photo && prev.photo !== saved.photo) await api.deletePhoto(prev.photo);
-    replaceOrAdd(saved, id);
-    return saved;
-  }
-
-  // 예시 모드: 이 브라우저 메모리에만 반영 (새로고침하면 사라진다)
-  if (photoBlob) entry.photo = URL.createObjectURL(photoBlob);
-  const saved = { ...entry, id: id || `local-${crypto.randomUUID()}` };
+  assertCloud();
+  const uid = state.user.id;
+  if (photoBlob) entry.photo = await api.uploadPhoto(photoBlob, uid);
+  const saved = id ? await api.updateEntry(id, entry, uid) : await api.insertEntry(entry, uid);
+  if (prev?.photo && prev.photo !== saved.photo) await api.deletePhoto(prev.photo);
   replaceOrAdd(saved, id);
   return saved;
 }
@@ -80,11 +87,10 @@ export async function markVisited(id) {
 }
 
 export async function removeEntry(id) {
+  assertCloud();
   const target = state.entries.find((x) => x.id === id);
-  if (state.mode === 'cloud') {
-    await api.deleteEntry(id);
-    if (target?.photo) await api.deletePhoto(target.photo);
-  }
+  await api.deleteEntry(id);
+  if (target?.photo) await api.deletePhoto(target.photo);
   store.set({ entries: state.entries.filter((x) => x.id !== id) });
 }
 

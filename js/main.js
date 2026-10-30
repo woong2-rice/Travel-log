@@ -1,7 +1,8 @@
 // 앱 시작점: 지도 데이터 → 서버 연결(실패하면 예시 기록) → 화면 4개 → 해시 라우터.
 import { h } from './lib/dom.js';
 import { loadMaps } from './data/maps.js';
-import { boot } from './data/store.js';
+import { boot, setLoginPrompt } from './data/store.js';
+import { createAuthGate } from './components/AuthGate.js';
 import { BottomNav, createToast, TABS } from './components/controls.js';
 import { createRegionSheet } from './components/RegionSheet.js';
 import { MapView } from './views/MapView.js';
@@ -45,6 +46,11 @@ async function start() {
   main.replaceChildren(...Object.values(views).map((v) => v.el));
   document.body.append(regionSheet.el);
 
+  // 로그인 관문: 로그인 안 한 채 기록을 남기려 하면 여기로
+  const gate = createAuthGate({ toast });
+  document.body.append(gate.el);
+  setLoginPrompt((reason) => gate.open(reason));
+
   function route() {
     const id = TABS.some((t) => `#${t.id}` === location.hash) ? location.hash.slice(1) : 'map';
     Object.entries(views).forEach(([k, v]) => { v.el.hidden = k !== id; });
@@ -60,6 +66,7 @@ async function start() {
   window.addEventListener('hashchange', route);
   window.addEventListener('popstate', route);
   route();
+  gate.openIfNeeded();
 }
 
 start();

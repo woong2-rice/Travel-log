@@ -5,7 +5,7 @@ import { createBottomSheet } from './BottomSheet.js';
 import { PhotoSlider } from './PhotoSlider.js';
 import { EntryForm } from './EntryForm.js';
 import { RegionGlyph, CloseButton } from './controls.js';
-import { store, entriesForRegion, knownCompanions, saveEntry, removeEntry, markVisited } from '../data/store.js';
+import { store, entriesForRegion, knownCompanions, saveEntry, removeEntry, markVisited, ensureLoggedIn } from '../data/store.js';
 import {
   fmtRange, fmtStay, fmtDate, fmtWon, costTotal, splitRegionName, STATUS_LABEL, COST_KEYS, COST_LABEL,
 } from '../lib/format.js';
@@ -24,7 +24,8 @@ export function createRegionSheet({ maps, toast, onClose }) {
     editing = null;
     expanded = new Set(expandId ? [expandId] : []);
     const hasEntries = entriesForRegion(store.get().entries, scope, regionId).length > 0;
-    mode = hasEntries ? 'view' : 'form';           // 처음 가는 곳은 바로 기록 폼
+    // 처음 가는 곳은 바로 기록 폼 (로그인했을 때만 — 아니면 요약과 '+ 기록 추가'만 보이고, 누르면 로그인을 권한다)
+    mode = !hasEntries && store.get().mode === 'cloud' ? 'form' : 'view';
     render();
     sheet.open(mode === 'form' ? 'full' : 'half');
     sheet.body.scrollTop = 0;
@@ -69,10 +70,12 @@ export function createRegionSheet({ maps, toast, onClose }) {
       h('button', { type: 'button', class: 'btn btn--text btn--danger', onClick: confirmDelete }, '삭제'),
     ].filter(Boolean));
     async function doMarkVisited() {
+      if (!ensureLoggedIn('기록을 바꾸려면 로그인이 필요해요.')) return;
       try { await markVisited(entry.id); toast.show('다녀왔어요로 바꿨어요.'); }
       catch (err) { toast.show(`바꾸지 못했어요. ${err.message || ''}`, { error: true }); }
     }
     function confirmDelete() {
+      if (!ensureLoggedIn('기록을 지우려면 로그인이 필요해요.')) return;
       actions.replaceChildren(
         h('span', { class: 'rs-confirm' }, '이 기록을 지울까요?'),
         h('button', { type: 'button', class: 'btn btn--text btn--danger', onClick: doDelete }, '지우기'),
@@ -141,6 +144,7 @@ export function createRegionSheet({ maps, toast, onClose }) {
   function render() { if (mode === 'form') renderForm(); else renderView(); }
 
   function startForm(entry) {
+    if (!ensureLoggedIn(entry ? '기록을 고치려면 로그인이 필요해요.' : '기록을 남기려면 로그인이 필요해요. 로그인하면 이 지도에 내 여행이 칠해져요.')) return;
     mode = 'form'; editing = entry;
     const form = renderForm();
     sheet.setSnap('full');

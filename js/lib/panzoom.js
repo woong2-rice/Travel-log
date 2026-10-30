@@ -23,24 +23,24 @@ export function createPanZoom(svg, { minScale = 1, maxScale = 16, onTap } = {}) 
     return Math.min(r.width / vb.w, r.height / vb.h);
   };
 
-  function clamp() {
-    const minW = home.w / maxScale;
-    const maxW = home.w / minScale;
-    const w = Math.min(maxW, Math.max(minW, vb.w));
-    const k = w / vb.w;
-    vb.w = w; vb.h *= k;
-    // 지도가 화면 밖으로 완전히 빠져나가지 않게
+  // 이동 한계: 지도가 화면 밖으로 완전히 빠져나가지 않게
+  function clampPan() {
     vb.x = Math.min(home.x + home.w - vb.w * 0.25, Math.max(home.x - vb.w * 0.75, vb.x));
     vb.y = Math.min(home.y + home.h - vb.h * 0.25, Math.max(home.y - vb.h * 0.75, vb.y));
   }
 
+  // 배율 한계를 '먼저' 적용한 뒤 그 배율로 기준점을 계산한다.
+  // (예전에는 한계 밖 배율로 위치를 계산하고 나서 크기만 줄여, 끝까지 축소하면 화면이 좌상단으로 쏠렸다)
   function zoomAt(pt, factor) {
-    const nw = vb.w * factor;
-    const nh = vb.h * factor;
-    vb.x = pt.x - (pt.x - vb.x) * (nw / vb.w);
-    vb.y = pt.y - (pt.y - vb.y) * (nh / vb.h);
-    vb.w = nw; vb.h = nh;
-    clamp(); apply();
+    const minW = home.w / maxScale;
+    const maxW = home.w / minScale;
+    const nw = Math.min(maxW, Math.max(minW, vb.w * factor));
+    if (nw >= maxW - 1e-6) { reset(); return; }          // 끝까지 축소하면 처음 모습(가운데)으로
+    const k = nw / vb.w;
+    vb.x = pt.x - (pt.x - vb.x) * k;
+    vb.y = pt.y - (pt.y - vb.y) * k;
+    vb.w = nw; vb.h *= k;
+    clampPan(); apply();
   }
 
   function zoomCenter(factor) {
@@ -100,7 +100,7 @@ export function createPanZoom(svg, { minScale = 1, maxScale = 16, onTap } = {}) 
       const k = pxPerUnit();
       vb.x = gesture.vbx - dx / k;
       vb.y = gesture.vby - dy / k;
-      clamp(); apply();
+      clampPan(); apply();
     } else if (gesture.type === 'pinch' && pointers.size === 2) {
       const [a, b] = [...pointers.values()];
       const dist = Math.hypot(a.x - b.x, a.y - b.y);
