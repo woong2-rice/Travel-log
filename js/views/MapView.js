@@ -5,7 +5,6 @@ import { createMapCanvas } from '../components/MapCanvas.js';
 import { SegmentedToggle, ProgressChip } from '../components/controls.js';
 import { store, regionCounts, progress, ensureLoggedIn } from '../data/store.js';
 import { PROVINCES } from '../data/maps.js';
-import { splitRegionName } from '../lib/format.js';
 
 const SCOPE_KEY = 'travel-log-v2-scope';
 export const readDefaultScope = () => { try { return localStorage.getItem(SCOPE_KEY) || 'domestic'; } catch { return 'domestic'; } };
@@ -29,8 +28,13 @@ export function MapView({ maps, regionSheet }) {
 
   // ---- 지역 찾기: 이름으로 국내·해외 지역을 바로 연다 (작은 섬나라·도시도 손가락으로 누르기 쉽게) ----
   const index = [
-    ...maps.kr.map((r) => ({ scope: 'domestic', id: r.id, full: r.name, name: r.name, parent: PROVINCES[r.id.slice(0, 2)] || '국내' })),
-    ...maps.world.map((r) => { const { name, parent } = splitRegionName(r.name); return { scope: 'world', id: r.id, full: r.name, name, parent: parent || '해외' }; }),
+    ...maps.kr.map((r) => {
+      const l = maps.label('domestic', r.id);
+      // 검색어는 원래 이름·화면 이름·시도 모두에 맞춘다 ('수영구', '부산 수영', '팔달구')
+      const prov = PROVINCES[r.id.slice(0, 2)] || '';
+      return { scope: 'domestic', id: r.id, raw: r.name, find: `${r.name} | ${l.full} | ${prov} ${r.name} | ${prov} ${l.name}`, name: l.name, parent: l.parent };
+    }),
+    ...maps.world.map((r) => { const l = maps.label('world', r.id); return { scope: 'world', id: r.id, raw: r.name, find: r.name, name: l.name, parent: l.parent || '해외' }; }),
   ];
   const searchInput = h('input', { class: 'input', type: 'search', placeholder: '지역이나 나라 이름', 'aria-label': '지역 찾기', autocomplete: 'off', enterkeyhint: 'search' });
   const results = h('ul', { class: 'map-search__results' });
@@ -45,11 +49,11 @@ export function MapView({ maps, regionSheet }) {
     const t = q.trim().toLowerCase();
     if (!t) return [];
     return index
-      .filter((r) => r.full.toLowerCase().includes(t))
-      .sort((a, b) => Number(!a.name.startsWith(t)) - Number(!b.name.startsWith(t)) || a.name.length - b.name.length)
+      .filter((r) => r.find.toLowerCase().includes(t) || r.find.replace(/\s+/g, '').toLowerCase().includes(t.replace(/\s+/g, '')))
+      .sort((a, b) => Number(!a.raw.startsWith(t)) - Number(!b.raw.startsWith(t)) || a.name.length - b.name.length)
       .slice(0, 8);
   }
-  function pick(r) { toggleSearch(false); showRegion(r.scope, r.id, r.full); }
+  function pick(r) { toggleSearch(false); showRegion(r.scope, r.id, r.raw); }
   searchInput.addEventListener('input', () => {
     const list = matches(searchInput.value);
     results.replaceChildren(...(list.length || !searchInput.value.trim()

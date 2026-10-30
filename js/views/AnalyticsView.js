@@ -5,7 +5,7 @@ import { ColumnChart, ShareBar, BarList, ProgressRows } from '../charts/charts.j
 import { RegionGlyph } from '../components/controls.js';
 import { store, computeStats } from '../data/store.js';
 import { PROVINCES } from '../data/maps.js';
-import { wonParts, fmtInt, pct, fmtDate, splitRegionName, COST_KEYS, COST_LABEL, fmtRange } from '../lib/format.js';
+import { wonParts, fmtInt, pct, fmtDate, COST_KEYS, COST_LABEL, fmtRange } from '../lib/format.js';
 
 export function AnalyticsView({ maps }) {
   const finding = h('p', { class: 'view__sub' });
@@ -31,7 +31,7 @@ export function AnalyticsView({ maps }) {
     let text = `올해 ${thisY}번 떠났어요`;
     if (lastY !== undefined) text += thisY === lastY ? ', 작년과 같아요.' : `, 작년보다 ${Math.abs(thisY - lastY)}번 ${thisY > lastY ? '많아요' : '적어요'}.`;
     else text += '.';
-    if (next) text += ` 다음은 ${fmtDate(next.startDate)} ${splitRegionName(next.regionName).name}.`;
+    if (next) text += ` 다음은 ${fmtDate(next.startDate)} ${maps.label(next.scope, next.regionId, next.regionName).name}.`;
     return text;
   }
 
@@ -73,7 +73,7 @@ export function AnalyticsView({ maps }) {
       BarList({
         unit: '번',
         rows: s.topRegions.slice(0, 5).map((r) => ({
-          label: splitRegionName(r.regionName).name, value: r.count,
+          label: maps.label(r.scope, r.regionId, r.regionName).name, value: r.count,
           sub: fmtDate(r.last),
           lead: RegionGlyph({ maps, scope: r.scope, regionId: r.regionId, size: 32 }),
         })),
@@ -102,17 +102,17 @@ export function AnalyticsView({ maps }) {
           BarList({ unit: '번', rows: s.countries.slice(0, 5).map(([name, n]) => ({ label: name, value: n })) }))
         : null,
       s.recent ? h('p', { class: 'cmp__recent' }, '가장 최근 여행 ',
-        h('strong', {}, splitRegionName(s.recent.regionName).name), ' ', h('span', { class: 'num' }, fmtRange(s.recent))) : null);
+        h('strong', {}, maps.label(s.recent.scope, s.recent.regionId, s.recent.regionName).name), ' ', h('span', { class: 'num' }, fmtRange(s.recent))) : null);
 
     const provinces = panel('provinces', '시·도별로 칠한 정도', `해외는 ${s.worldProgress.done}개 나라`,
       ProgressRows({ rows: provinceRows }));
 
     const nextRows = [
       ...s.planned.slice(0, 4).map((e) => h('li', {},
-        h('span', { class: 'next-list__name' }, splitRegionName(e.regionName).name),
+        h('span', { class: 'next-list__name' }, maps.label(e.scope, e.regionId, e.regionName).name),
         h('span', { class: 'num next-list__date' }, fmtRange(e)))),
       ...s.wishlist.slice(0, 5 - Math.min(4, s.planned.length)).map((e) => h('li', {},
-        h('span', { class: 'next-list__name' }, splitRegionName(e.regionName).name),
+        h('span', { class: 'next-list__name' }, maps.label(e.scope, e.regionId, e.regionName).name),
         h('span', { class: 'tag tag--wishlist' }, '가고 싶어요'))),
     ];
     const next = nextRows.length

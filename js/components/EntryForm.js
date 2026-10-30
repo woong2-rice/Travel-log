@@ -14,7 +14,7 @@ const STATUS_OPTIONS = [
 
 const digits = (v) => Number(String(v).replace(/[^\d]/g, '')) || 0;
 
-export function EntryForm({ scope, regionId, regionName, entry = null, suggestions = [], onSubmit, onCancel }) {
+export function EntryForm({ scope, regionId, regionName, displayName = regionName, entry = null, suggestions = [], onSubmit, onCancel }) {
   let status = entry?.status || 'visited';
   let photoBlob = null;
   let photoUrl = entry?.photo || null;
@@ -123,7 +123,7 @@ export function EntryForm({ scope, regionId, regionName, entry = null, suggestio
   const submitLabel = entry ? '수정 저장' : '기록 저장';
   const submit = h('button', { type: 'submit', class: 'btn btn--primary' }, submitLabel);
 
-  const form = h('form', { class: 'entry-form', novalidate: true, 'aria-label': `${regionName} 기록 ${entry ? '수정' : '추가'}` },
+  const form = h('form', { class: 'entry-form', novalidate: true, 'aria-label': `${displayName} 기록 ${entry ? '수정' : '추가'}` },
     h('div', { class: 'form__essentials' },
       h('div', { class: 'field' }, h('span', { class: 'field__label', id: 'f-status-label' }, '상태'), statusToggle),
       dates),

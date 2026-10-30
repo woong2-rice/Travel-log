@@ -3,9 +3,10 @@
 import { h, icon } from '../lib/dom.js';
 import { RegionGlyph } from '../components/controls.js';
 import { store, timelineGroups } from '../data/store.js';
-import { fmtRange, fmtStay, splitRegionName, daysOf, STATUS_LABEL } from '../lib/format.js';
+import { fmtRange, fmtStay, daysOf, STATUS_LABEL } from '../lib/format.js';
 
 export function TimelineView({ maps, onOpen }) {
+  const labelOf = (e) => maps.label(e.scope, e.regionId, e.regionName).full;   // 검색: '부산 수영구'로도 찾게
   let query = '';
   const summary = h('p', { class: 'view__sub' });
   const list = h('div', { class: 'tl' });
@@ -22,7 +23,7 @@ export function TimelineView({ maps, onOpen }) {
     list);
 
   function card(entry) {
-    const { name, parent } = splitRegionName(entry.regionName);
+    const { name, parent } = maps.label(entry.scope, entry.regionId, entry.regionName);
     const thumb = entry.photo
       ? h('img', { class: 'tl-card__img', src: entry.photo, alt: '', loading: 'lazy', decoding: 'async' })
       : RegionGlyph({ maps, scope: entry.scope, regionId: entry.regionId, size: 64, filled: entry.status === 'visited' });
@@ -48,19 +49,19 @@ export function TimelineView({ maps, onOpen }) {
       summary.textContent = `${firstYear}년부터 ${trips.length}번의 여행, ${trips.reduce((s, e) => s + daysOf(e), 0)}일`;
     } else summary.textContent = '';
 
-    const groups = query ? timelineGroups(state.entries, query) : all;
+    const groups = query ? timelineGroups(state.entries, query, labelOf) : all;
     // 날짜 없는 '가고 싶어요' (기존 앱 플랜 탭의 위시리스트)
     const q = query.trim().toLowerCase();
     const wishes = state.entries
-      .filter((e) => e.status === 'wishlist' && (!q || `${e.regionName} ${e.companion} ${e.place}`.toLowerCase().includes(q)))
-      .sort((a, b) => a.regionName.localeCompare(b.regionName, 'ko'));
+      .filter((e) => e.status === 'wishlist' && (!q || `${e.regionName} ${labelOf(e)} ${e.companion} ${e.place}`.toLowerCase().includes(q)))
+      .sort((a, b) => labelOf(a).localeCompare(labelOf(b), 'ko'));
     const wishSection = wishes.length
       ? h('section', { class: 'tl-year tl-wish', 'aria-labelledby': 'y-wish' },
         h('h2', { class: 'tl-year__h', id: 'y-wish' },
           h('span', { class: 'tl-wish__title' }, '언젠가 가고 싶은 곳'),
           h('span', { class: 'tl-year__count' }, `${wishes.length}곳`)),
         h('ul', { class: 'tl-wish__list' }, wishes.map((e) => {
-          const { name, parent } = splitRegionName(e.regionName);
+          const { name, parent } = maps.label(e.scope, e.regionId, e.regionName);
           return h('li', {}, h('button', {
             type: 'button', class: 'tl-wish__item',
             onClick: () => onOpen(e.scope, e.regionId, e.regionName, { expandId: e.id }),

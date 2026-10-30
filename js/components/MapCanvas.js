@@ -25,7 +25,7 @@ export function createMapCanvas({ scope, maps, onSelect }) {
   const layer = s('g', { class: 'map-regions' });
   const paths = new Map();
   for (const r of regions) {
-    const name = r.name;
+    const name = maps.label(scope, r.id).full;    // 툴팁·스크린리더: '부산시 수영구', '강원 강릉시'
     const p = s('path', {
       class: `region${r.kind ? ` region--${r.kind}` : ''}`, d: r.d, 'data-id': r.id,
       tabindex: scope === 'domestic' ? '0' : '-1', role: 'button', 'aria-label': name,

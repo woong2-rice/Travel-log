@@ -153,11 +153,11 @@ export function knownCompanions(entries) {
 }
 
 /** 연표용: 다녀온 + 계획 중 기록을 연도별로 (최신 연도부터) */
-export function timelineGroups(entries, query = '') {
+export function timelineGroups(entries, query = '', labelOf = () => '') {
   const q = query.trim().toLowerCase();
   const list = entries
     .filter((e) => e.status !== 'wishlist' && e.startDate)
-    .filter((e) => !q || `${e.regionName} ${e.companion} ${e.place}`.toLowerCase().includes(q))
+    .filter((e) => !q || `${e.regionName} ${labelOf(e)} ${e.companion} ${e.place}`.toLowerCase().includes(q))
     .sort(byDateDesc);
   const groups = new Map();
   for (const e of list) {

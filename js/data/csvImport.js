@@ -64,6 +64,7 @@ function buildResolver(maps) {
     add('world', r.name, r.id);                          // '후쿠오카현 · 일본'
     const short = r.name.includes('·') ? r.name.split('·')[0].trim() : r.name;
     add('world', short, r.id);                            // '후쿠오카현'
+    if (r.name.includes('·')) add('world', `${r.name.split('·')[1].trim()} ${short}`, r.id);   // '일본 후쿠오카현' (내려받기 표기)
   });
 
   return function resolve(scope, name, id) {

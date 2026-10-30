@@ -8,6 +8,24 @@ export const PROVINCES = {
   31: '경기', 32: '강원', 33: '충북', 34: '충남', 35: '전북', 36: '전남', 37: '경북', 38: '경남', 39: '제주',
 };
 
+// 특별·광역시: 구·군 이름만으로는 어디인지 모르므로 '부산시 수영구'처럼 시 이름을 붙인다
+const METRO = { 11: '서울', 21: '부산', 22: '대구', 23: '인천', 24: '광주', 25: '대전', 26: '울산' };
+
+/**
+ * 화면에 보이는 국내 지역 이름. 저장된 기록(region_name)은 바꾸지 않고 보여줄 때만 다듬는다.
+ *   수영구(부산)      → { name: '부산시 수영구', parent: '' }
+ *   수원시팔달구(경기) → { name: '수원시 팔달구', parent: '경기' }
+ *   강릉시(강원)      → { name: '강릉시',       parent: '강원' }
+ */
+export function domesticLabel(id, raw) {
+  const code = String(id).slice(0, 2);
+  const metro = METRO[code];
+  if (metro) return { name: `${metro}시 ${raw}`, parent: '' };
+  if (code === '29') return { name: raw, parent: '' };                    // 세종시
+  const m = raw.match(/^(.+?시)(.+[구])$/);                               // 수원시팔달구 → 수원시 팔달구
+  return { name: m ? `${m[1]} ${m[2]}` : raw, parent: PROVINCES[code] || '' };
+}
+
 async function getJson(file) {
   const res = await fetch(new URL(file, BASE));
   if (!res.ok) throw new Error(`${file} 을(를) 불러오지 못했어요 (${res.status})`);
@@ -99,6 +117,19 @@ export async function loadMaps() {
     region: (scope, id) => index[scope].get(id) || null,
     bbox,
     countryOf: (id) => { const r = index.world.get(id); return r ? countryOf(r) : null; },
+    /** 화면용 이름: { name, parent, full } — 국내는 '부산시 수영구', 해외는 '후쿠오카현' + '일본' */
+    label(scope, id, fallback = '') {
+      const r = index[scope]?.get(id);
+      const raw = r?.name || fallback;
+      let out;
+      if (scope === 'domestic') out = domesticLabel(id, raw);
+      else {
+        const [name, parent = ''] = raw.split('·').map((t) => t.trim());
+        out = { name, parent };
+      }
+      out.full = out.parent ? `${out.parent} ${out.name}` : out.name;
+      return out;
+    },
     totals: { domestic: kr.length, world: countries.size },
   };
 }

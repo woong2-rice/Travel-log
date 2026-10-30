@@ -7,7 +7,7 @@ import { EntryForm } from './EntryForm.js';
 import { RegionGlyph, CloseButton } from './controls.js';
 import { store, entriesForRegion, knownCompanions, saveEntry, removeEntry, markVisited, ensureLoggedIn } from '../data/store.js';
 import {
-  fmtRange, fmtStay, fmtDate, fmtWon, costTotal, splitRegionName, STATUS_LABEL, COST_KEYS, COST_LABEL,
+  fmtRange, fmtStay, fmtDate, fmtWon, costTotal, STATUS_LABEL, COST_KEYS, COST_LABEL,
 } from '../lib/format.js';
 
 export function createRegionSheet({ maps, toast, onClose }) {
@@ -33,7 +33,7 @@ export function createRegionSheet({ maps, toast, onClose }) {
 
   // ------------------------------------------------------------ 머리
   function header(list) {
-    const { name, parent } = splitRegionName(current.regionName);
+    const { name, parent } = maps.label(current.scope, current.regionId, current.regionName);
     const visited = list.filter((e) => e.status === 'visited');
     const planned = list.filter((e) => e.status === 'planned').length;
     const bits = [];
@@ -107,7 +107,7 @@ export function createRegionSheet({ maps, toast, onClose }) {
   function renderView() {
     const list = entriesForRegion(store.get().entries, current.scope, current.regionId);
     const photos = list.filter((e) => e.photo).map((e) => ({
-      url: e.photo, alt: `${current.regionName} ${fmtRange(e)} 사진`, caption: fmtRange(e),
+      url: e.photo, alt: `${maps.label(current.scope, current.regionId).full} ${fmtRange(e)} 사진`, caption: fmtRange(e),
     }));
     sheet.body.replaceChildren(...[
       header(list),
@@ -125,7 +125,8 @@ export function createRegionSheet({ maps, toast, onClose }) {
   function renderForm() {
     const list = entriesForRegion(store.get().entries, current.scope, current.regionId);
     const form = EntryForm({
-      scope: current.scope, regionId: current.regionId, regionName: current.regionName, entry: editing,
+      scope: current.scope, regionId: current.regionId, regionName: current.regionName,
+      displayName: maps.label(current.scope, current.regionId).full, entry: editing,
       suggestions: knownCompanions(store.get().entries),
       onCancel: () => (list.length ? backToView() : sheet.close()),
       onSubmit: async (draft, { photoBlob, removePhoto }) => {

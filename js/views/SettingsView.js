@@ -82,7 +82,7 @@ export function SettingsView({ toast, maps }) {
     // 마지막 '지역ID' 열 덕분에 다시 올릴 때 '중구'처럼 이름이 같은 지역도 정확히 찾는다
     const head = ['시작일', '종료일', '구분', '상태', '지역', '동행', '세부장소', '메모', '항공료', '숙박비', '교통비', '식비', '기타비용', '합계', '지역ID'];
     const rows = entries.map((e) => [e.startDate, e.endDate, e.scope === 'domestic' ? '국내' : '해외', STATUS_LABEL[e.status],
-      e.regionName, e.companion, e.place, e.note, ...COST_KEYS.map((k) => e.costs[k] || 0), costTotal(e), e.regionId]);
+      maps.label(e.scope, e.regionId, e.regionName).full, e.companion, e.place, e.note, ...COST_KEYS.map((k) => e.costs[k] || 0), costTotal(e), e.regionId]);
     const url = URL.createObjectURL(new Blob([`\ufeff${toCsv([head, ...rows])}`], { type: 'text/csv;charset=utf-8' }));
     const a = h('a', { href: url, download: `여행기록_${new Date().toISOString().slice(0, 10)}.csv` });
     document.body.append(a); a.click(); a.remove(); URL.revokeObjectURL(url);
