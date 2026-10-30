@@ -22,6 +22,7 @@
     lib/                    dom(h·아이콘·접힘 섹션) · format(날짜·금액) · panzoom · image · theme(칠하는 색 11가지)
     data/
       api.js                Supabase 연결 (기존 schema.sql 그대로)
+      csvImport.js          CSV → 기록 (지역 이름/ID 찾기, 중복·오류 행 골라내기, 미리보기 후 저장)
       store.js              상태 + 저장/삭제 action + 모든 집계 selector
       maps.js · sample.js   지도 데이터 로딩(세계지도는 밀러 원통 도법(평면 지도)으로 다시 투영) / 예시 기록
     components/
@@ -34,6 +35,8 @@
     charts/  charts.js (연도 막대, 비용 100% 막대+범례 표, 순위 목록, 시·도 진행 막대)
   data/*.json          지도 데이터 (KR_MAP / WORLD_MAP / 국경 외곽선)
   supabase/schema.sql  entries 테이블 + RLS + trip-photos Storage 정책
+  supabase/inactive-accounts.sql  마지막 접속 기록(user_activity) + touch_activity()
+  scripts/inactive-accounts.mjs   휴면 계정 정리 (GitHub Actions 가 매일 실행)
   manifest.json · sw.js · favicon.svg · icon/   PWA
 ```
 
@@ -86,3 +89,39 @@
 ```
 npx serve .
 ```
+
+## CSV 가져오기 · 내보내기
+
+- 설정 › 기록 내보내기: 모든 기록을 CSV로 받는다. 마지막 열 `지역ID` 덕분에 다시 올릴 때 이름이 같은 지역(중구 등)도 정확히 찾는다.
+- 설정 › 기록 가져오기: CSV를 고르면 바로 저장하지 않고 '새로 추가 / 이미 있음 / 확인 필요'를 먼저 보여준다. 확인을 누르면 저장.
+  - 열 이름: 시작일, 종료일, 구분(국내/해외), 상태, 지역, 동행, 세부장소, 메모, 항공료, 숙박비, 교통비, 식비, 기타비용, (선택) 지역ID
+  - 날짜는 `2025-05-03`, `2025.5.3`, `2025/05/03` 모두 가능. 엑셀에서 저장한 CP949 파일도 읽는다.
+  - 같은 이름이 여러 곳인 지역은 `부산 중구`처럼 시·도를 붙이거나 지역ID 열을 넣는다.
+  - 같은 지역·상태·날짜의 기록이 이미 있으면 건너뛴다 (같은 파일을 두 번 올려도 두 번 생기지 않음).
+  - 사진은 CSV에 담기지 않는다.
+
+## 휴면 계정 정리
+
+정책: **1년 동안 접속이 없으면 안내 메일 → 메일 보낸 날부터 6개월 안에 접속이 없으면 계정·기록·사진 삭제.**
+앱을 한 번 열기만 해도 삭제 예정이 풀린다. (설정 › 계정에도 같은 안내가 보인다)
+
+'접속'은 앱을 연 때(12시간에 한 번 `touch_activity()` 기록), 마지막 로그인, 가입일 중 가장 늦은 때.
+
+### 처음 한 번 설정
+1. **SQL** — Supabase 대시보드 › SQL Editor 에서 `supabase/inactive-accounts.sql` 실행.
+2. **메일 계정** — 보내는 메일 주소의 SMTP 정보를 준비한다. 예) Gmail: 2단계 인증을 켠 뒤 '앱 비밀번호'를 만들어 쓴다.
+3. **GitHub Secrets** — 저장소 Settings › Secrets and variables › Actions › New repository secret
+
+   | 이름 | 값 |
+   |------|----|
+   | `SUPABASE_URL` | (keep-alive 용으로 이미 있음) |
+   | `SUPABASE_SERVICE_ROLE_KEY` | Supabase › Project Settings › API › `service_role` 키 — **앱 코드에 절대 넣지 말 것** |
+   | `SMTP_HOST` / `SMTP_PORT` | Gmail 이면 `smtp.gmail.com` / `465` |
+   | `SMTP_USER` / `SMTP_PASS` | 보내는 메일 주소 / 앱 비밀번호 |
+   | `MAIL_FROM` | `여행 기록장 <보내는주소@gmail.com>` |
+   | `APP_URL` | `https://woong2-rice.github.io/Travel-log/` |
+
+4. **연습 실행** — Actions › Inactive accounts › Run workflow (dry_run 체크된 채로). 로그에 누구에게 메일을 보내고 누구를 지울지만 나온다.
+5. 이후로는 매일 새벽 3:41(한국시간)에 자동으로 실제 실행된다.
+
+메모: 2023년 개인정보보호법 개정으로 '1년 미이용 시 파기' 의무(유효기간제)는 없어졌다. 이 정리는 서비스의 자체 정책이므로, 위 내용을 개인정보 처리방침에도 적어 두는 것이 좋다.

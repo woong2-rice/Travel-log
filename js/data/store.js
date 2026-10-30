@@ -36,12 +36,24 @@ export async function boot() {
 
 async function enterCloud(session) {
   store.set({ loading: true, user: { id: session.user.id, email: session.user.email || '' }, mode: 'cloud' });
+  touchActivityThrottled(session.user.id);
   try {
     store.set({ entries: await api.fetchEntries(session.user.id), loading: false, error: null });
   } catch (err) {
     console.error(err);
     store.set({ loading: false, error: `기록을 불러오지 못했어요. ${err.message || ''}`.trim() });
   }
+}
+
+// 접속 기록은 12시간에 한 번만 남긴다 (매번 열 때마다 서버에 쓰지 않게)
+function touchActivityThrottled(userId) {
+  const key = `travel-log-touched-${userId}`;
+  try {
+    const last = Number(localStorage.getItem(key)) || 0;
+    if (Date.now() - last < 12 * 3600 * 1000) return;
+    localStorage.setItem(key, String(Date.now()));
+  } catch { /* 저장소를 못 쓰면 매번 남긴다 */ }
+  api.touchActivity();
 }
 
 // ---------------------------------------------------------------- 로그인 확인
@@ -84,6 +96,17 @@ export async function markVisited(id) {
   if (!entry) return null;
   const { id: _omit, photo: _p, ...draft } = entry;
   return saveEntry({ ...draft, status: 'visited' }, { id });
+}
+
+/** CSV 가져오기: 200건씩 나눠 저장한다 */
+export async function importEntries(list) {
+  assertCloud();
+  const added = [];
+  for (let i = 0; i < list.length; i += 200) {
+    added.push(...await api.insertEntries(list.slice(i, i + 200), state.user.id));
+  }
+  store.set({ entries: [...state.entries, ...added] });
+  return added.length;
 }
 
 export async function removeEntry(id) {

@@ -41,7 +41,7 @@ async function start() {
     map: mapView,
     timeline: TimelineView({ maps, onOpen: (scope, id, name, opts) => { go('map'); mapView.showRegion(scope, id, name, opts); } }),
     analytics: AnalyticsView({ maps }),
-    settings: SettingsView({ toast }),
+    settings: SettingsView({ toast, maps }),
   };
   main.replaceChildren(...Object.values(views).map((v) => v.el));
   document.body.append(regionSheet.el);

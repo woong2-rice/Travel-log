@@ -78,6 +78,13 @@ export async function insertEntry(entry, userId) {
   return rowToEntry(data);
 }
 
+/** 여러 기록을 한 번에 (CSV 가져오기) */
+export async function insertEntries(entries, userId) {
+  const { data, error } = await sb.from('entries').insert(entries.map((e) => entryToRow({ ...e, photo: null }, userId))).select();
+  if (error) throw error;
+  return (data || []).map(rowToEntry);
+}
+
 export async function updateEntry(id, entry, userId) {
   const { data, error } = await sb.from('entries').update(entryToRow(entry, userId)).eq('id', id).select().single();
   if (error) throw error;
@@ -87,6 +94,14 @@ export async function updateEntry(id, entry, userId) {
 export async function deleteEntry(id) {
   const { error } = await sb.from('entries').delete().eq('id', id);
   if (error) throw error;
+}
+
+// ---------- 마지막 접속 기록 (휴면 계정 정리용, supabase/inactive-accounts.sql) ----------
+/** 접속했다고 남긴다. 안내 메일을 받았던 계정이면 삭제 예정도 이때 풀린다. 실패해도 앱 사용에는 영향 없음. */
+export async function touchActivity() {
+  if (!sb) return;
+  const { error } = await sb.rpc('touch_activity');
+  if (error) console.warn('접속 기록을 남기지 못했어요(무시)', error.message);
 }
 
 // ---------- 사진 (trip-photos 버킷) ----------

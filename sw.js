@@ -3,7 +3,7 @@
    - 폰트·supabase-js CDN은 런타임 캐시(stale-while-revalidate)
    - Supabase API(인증·데이터)는 항상 네트워크로 통과시킴 (캐시 안 함) */
 
-const VERSION = 'v7';   // 화면 전면 개편 (지도·연표·분석·설정 / ES 모듈 구조)
+const VERSION = 'v8';   // 화면 전면 개편 (지도·연표·분석·설정 / ES 모듈 구조)
 const SHELL_CACHE = `travel-log-shell-${VERSION}`;
 const RUNTIME_CACHE = `travel-log-runtime-${VERSION}`;
 
@@ -20,9 +20,11 @@ const SHELL_ASSETS = [
   'js/components/RegionSheet.js',
   'js/components/controls.js',
   'js/data/api.js',
+  'js/data/csvImport.js',
   'js/data/maps.js',
   'js/data/sample.js',
   'js/data/store.js',
+  'js/lib/csv.js',
   'js/lib/dom.js',
   'js/lib/format.js',
   'js/lib/image.js',

@@ -1,0 +1,53 @@
+# 휴면 계정 정리 (scripts/inactive-accounts.mjs)
+#   1년 동안 접속 없음 → 안내 메일, 메일 보낸 날부터 6개월 뒤에도 접속 없음 → 계정·기록·사진 삭제
+#
+# 처음 한 번 준비 (README '휴면 계정 정리' 참고)
+#   1. Supabase SQL Editor 에서 supabase/inactive-accounts.sql 실행
+#   2. 저장소 Settings > Secrets and variables > Actions 에 아래 Secret 등록
+#      SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY,
+#      SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASS, MAIL_FROM, APP_URL
+#   3. Actions 탭에서 이 워크플로를 수동 실행(dry_run = true)해 로그로 결과를 먼저 확인
+name: Inactive accounts
+
+on:
+  schedule:
+    # 매일 18:41 UTC (한국시간 새벽 3:41). 정각은 GitHub 대기열이 몰려 피함.
+    - cron: '41 18 * * *'
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: '연습 실행 (메일·삭제 없이 로그만)'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inactive-accounts
+  cancel-in-progress: false
+
+jobs:
+  sweep:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Install
+        run: npm install --no-save --no-package-lock @supabase/supabase-js@2.45.4 nodemailer@6.9.14
+      - name: Sweep
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SMTP_HOST: ${{ secrets.SMTP_HOST }}
+          SMTP_PORT: ${{ secrets.SMTP_PORT }}
+          SMTP_USER: ${{ secrets.SMTP_USER }}
+          SMTP_PASS: ${{ secrets.SMTP_PASS }}
+          MAIL_FROM: ${{ secrets.MAIL_FROM }}
+          APP_URL: ${{ secrets.APP_URL }}
+          # 예약 실행은 실제로 처리, 수동 실행은 고른 값(기본: 연습)
+          DRY_RUN: ${{ github.event_name == 'workflow_dispatch' && inputs.dry_run || 'false' }}
+        run: node scripts/inactive-accounts.mjs
