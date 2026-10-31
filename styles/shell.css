@@ -106,7 +106,7 @@ body.is-gated .views, body.is-gated .tabbar, body.is-gated .sheet { visibility: 
 .gate__offline { color: var(--negative); }
 .gate__browse { justify-self: center; margin-top: 4px; color: var(--muted); }
 .login-form .btn--primary { width: 100%; }
-.login-form .set-form__row .btn--primary { width: auto; min-width: 120px; }
+.login-form .set-form__row .btn--text:disabled { color: var(--faint); opacity: 1; cursor: default; }
 
 /* ---- 지도 위 '예시 · 로그인' ---- */
 .sample-pill {

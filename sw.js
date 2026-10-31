@@ -3,7 +3,7 @@
    - 폰트·supabase-js CDN은 런타임 캐시(stale-while-revalidate)
    - Supabase API(인증·데이터)는 항상 네트워크로 통과시킴 (캐시 안 함) */
 
-const VERSION = 'v10';   // 설정 화면에 피드백 추가
+const VERSION = 'v11';   // 설정 화면에 피드백 추가
 const SHELL_CACHE = `travel-log-shell-${VERSION}`;
 const RUNTIME_CACHE = `travel-log-runtime-${VERSION}`;
 
