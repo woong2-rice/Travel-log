@@ -9,6 +9,7 @@ import { readDefaultScope, writeDefaultScope } from './MapView.js';
 import { STATUS_LABEL, costTotal, COST_KEYS } from '../lib/format.js';
 import { THEMES, readTheme, saveTheme } from '../lib/theme.js';
 import { LoginForm } from '../components/LoginForm.js';
+import '../lib/feedback-widget.js';   // 피드백 창(런치패드 공용) — window.LaunchFeedback
 
 export function SettingsView({ toast, maps }) {
   const accountPanel = h('div', { class: 'set-panel' });
@@ -74,6 +75,12 @@ export function SettingsView({ toast, maps }) {
   const marks = h('ul', { class: 'marks' },
     h('li', {}, h('span', { class: 'mark mark--planned', 'aria-hidden': 'true' }), STATUS_LABEL.planned),
     h('li', {}, h('span', { class: 'mark mark--wishlist', 'aria-hidden': 'true' }), STATUS_LABEL.wishlist));
+
+  // ---- 피드백 ----
+  function openFeedback() {
+    window.LaunchFeedback?.open({ app: 'travel-log', lang: 'ko',
+      theme: { bg: '#FFFFFF', ink: '#22241F', muted: '#5E615A', surface: '#F3F1EC', accent: '#22241F', accentInk: '#F9F8F6', radius: 12 } });
+  }
 
   // ---- 내보내기 ----
   function exportCsv() {
@@ -152,7 +159,11 @@ export function SettingsView({ toast, maps }) {
     section('기록 내보내기', '엑셀에서 열 수 있는 CSV 파일로 모든 기록을 받아요.', h('div', { class: 'set-panel' },
       h('div', { class: 'set-row' },
         h('p', { class: 'set-row__title' }, '기록 ', exportCount, '건'),
-        h('button', { type: 'button', class: 'btn btn--secondary', onClick: exportCsv }, icon('download'), 'CSV 내려받기')))));
+        h('button', { type: 'button', class: 'btn btn--secondary', onClick: exportCsv }, icon('download'), 'CSV 내려받기')))),
+    section('피드백', '불편했던 점이나 있었으면 하는 기능을 알려 주세요. 보낸 내용만 전해지고, 기록은 함께 가지 않아요.', h('div', { class: 'set-panel' },
+      h('div', { class: 'set-row' },
+        h('p', { class: 'set-row__title' }, '의견 보내기'),
+        h('button', { type: 'button', class: 'btn btn--secondary', onClick: openFeedback }, '피드백 보내기')))));
 
   function render(state) {
     renderAccount(state);
