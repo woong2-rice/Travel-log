@@ -143,7 +143,11 @@ export function describeAuthError(error, step) {
   if (status === 429 || code.includes('rate_limit')) {
     return step === 'send' ? '요청이 너무 잦아요. 1분 뒤에 다시 코드를 받아 주세요.' : '시도가 너무 많아요. 잠시 후 다시 입력해 주세요.';
   }
-  if (status >= 500) return '서버에 일시적인 문제가 있어요. 잠시 후 다시 시도해 주세요.';
+  if (status >= 500) {
+    // 서버가 준 원인을 같이 보여준다 (예: 'Error sending magic link email' = 메일 발송 설정 문제,
+    // 'Database error saving new user' = 새 계정 저장 중 DB 오류). 원인을 알아야 고칠 수 있다.
+    return `서버에서 처리하지 못했어요. 잠시 후 다시 시도하고, 계속되면 이 문구를 알려 주세요: ${error.message || status}`;
+  }
   if (step === 'send') {
     if (code === 'email_address_invalid' || code === 'validation_failed') return '이메일 주소 형식을 다시 확인해 주세요.';
     return `코드를 보내지 못했어요: ${error.message}`;
